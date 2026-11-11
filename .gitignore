@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# 测试与类型检查缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 训练产物
+logs/
+outputs/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+wandb/
+.hydra/
+
+# 环境与本地配置
+.env
+.env.*
+*.local
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# 注意：model/*.usdz 和 src/wheel_legged_lab/assets/*.usd 是运行必需的大二进制
+# 文件（合计约 108 MB），默认保持跟踪。首次提交前建议用 Git LFS：
+#   git lfs install
+#   git lfs track "*.usd" "*.usdz"

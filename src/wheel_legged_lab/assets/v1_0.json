@@ -1,0 +1,89 @@
+{
+  "name": "wheelbipe_v1_0",
+  "usd": "wheelbipe_v1_0.usd",
+  "base_body": "base_link",
+  "wheel_bodies": [
+    "left_wheel_link",
+    "right_wheel_link"
+  ],
+  "termination_bodies": [
+    "base_link",
+    "gimbal_yaw_link"
+  ],
+  "rest_height": 0.309195,
+  "wheel_radius": 0.059865,
+  "rest_joint_positions": {
+    ".*left_front1_joint": -0.63072,
+    ".*right_front1_joint": 0.63199,
+    ".*left_rear1_joint": 0.53583,
+    ".*right_rear1_joint": -0.53614,
+    ".*left_front2_joint": 0.80933,
+    ".*left_front3_joint": -0.45309,
+    ".*left_front4_joint": 0.81592,
+    ".*left_rear2_joint": -0.80145,
+    ".*left_rear2_rod_joint": 0.86589,
+    ".*left_spring1_joint": 0.07005,
+    ".*left_f3r1a_joint": 0.00033,
+    ".*left_f4r2a_joint": 0.03308,
+    ".*right_front2_joint": -0.81049,
+    ".*right_front3_joint": 0.45374,
+    ".*right_front4_joint": -0.81649,
+    ".*right_rear2_joint": 0.80282,
+    ".*right_rear2_rod_joint": -0.86806,
+    ".*right_spring1_joint": -0.07035,
+    ".*right_f3r1a_joint": -0.00037,
+    ".*right_f4r2a_joint": -0.21075,
+    ".*_spring2_joint": -0.0482,
+    "gimbal_yaw_joint": 0.0,
+    ".*_wheel_joint": 0.0
+  },
+  "motors": [
+    {
+      "name": "legs",
+      "joints": [
+        "left_front1_joint",
+        "left_rear1_joint",
+        "right_front1_joint",
+        "right_rear1_joint"
+      ],
+      "mode": "position",
+      "action_scale": 0.5,
+      "kp": 60.0,
+      "kd": 2.0,
+      "effort_limit": 160.0,
+      "speed_limit": 40.1,
+      "armature": 0.015795
+    },
+    {
+      "name": "wheels",
+      "joints": [
+        "left_wheel_joint",
+        "right_wheel_joint"
+      ],
+      "mode": "velocity",
+      "action_scale": 10.0,
+      "kp": 0.0,
+      "kd": 0.2,
+      "effort_limit": 5.0,
+      "speed_limit": 60.0,
+      "armature": 0.001
+    }
+  ],
+  "passive_joint_patterns": [
+    ".*_front2_joint",
+    ".*_front3_joint",
+    ".*_front4_joint",
+    ".*_rear2_joint",
+    ".*_rear2_rod_joint",
+    ".*_f3r1a_joint",
+    ".*_f4r2a_joint",
+    ".*_spring1_joint"
+  ],
+  "spring_joints": [
+    "left_spring2_joint",
+    "right_spring2_joint"
+  ],
+  "auxiliary_joints": [
+    "gimbal_yaw_joint"
+  ]
+}

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wheel-legged-lab"
+version = "0.1.0"
+description = "Composable wheeled-legged tasks for Isaac Lab"
+requires-python = ">=3.11"
+# Use the existing Isaac Sim / Isaac Lab environment. Do not auto-upgrade it.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+wheel_legged_lab = ["assets/*.json", "assets/*.usd"]

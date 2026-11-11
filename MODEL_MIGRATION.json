@@ -1,0 +1,393 @@
+{
+  "source": "model/v2_0.usdz",
+  "source_sha256": "306e5255d85a9022ba5b6f5917d7c653814cdd6d210b0024967a97c284a13358",
+  "asset": "src/wheel_legged_lab/assets/wheelbipe_v2_0.usd",
+  "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+  "spec": "src/wheel_legged_lab/assets/v2_0.json",
+  "spec_sha256": "9f9631ef6778b0237c83ac92b2f45a4ce79d4cb9988e33c8d5a85f15b19ea8a0",
+  "base_translation_removed": [
+    0.17020701599000002,
+    -0.005903785705000001,
+    -0.0695
+  ],
+  "rigid_bodies": [
+    "base_link",
+    "imu_link",
+    "gimbal_yaw_link",
+    "gimbal_pitch_link",
+    "right_thigh_link",
+    "right_connect_03_link",
+    "right_connect_05_link",
+    "right_spring_1_link",
+    "right_spring_2_link",
+    "right_leg_1_link",
+    "right_leg_2_link",
+    "right_leg_3_link",
+    "right_connect_30_link",
+    "right_leg_4_link",
+    "right_leg_5_link",
+    "right_spring_3_link",
+    "right_connect_50_link",
+    "right_wheel_link",
+    "left_thigh_link",
+    "left_connect_03_link",
+    "left_connect_05_link",
+    "left_spring_1_link",
+    "left_spring_2_link",
+    "left_leg_1_link",
+    "left_leg_2_link",
+    "left_leg_3_link",
+    "left_connect_30_link",
+    "left_leg_4_link",
+    "left_leg_5_link",
+    "left_spring_3_link",
+    "left_connect_50_link",
+    "left_wheel_link"
+  ],
+  "dof_count": 30,
+  "loop_constraint_count": 6,
+  "joints": [
+    {
+      "name": "imu_joint",
+      "type": "PhysicsFixedJoint",
+      "body0": "base_link",
+      "body1": "imu_link",
+      "excluded": false,
+      "anchor_error_m": 7.306678145966279e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "gimbal_yaw_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "base_link",
+      "body1": "gimbal_yaw_link",
+      "excluded": false,
+      "anchor_error_m": 7.3338563820401654e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "gimbal_pitch_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "gimbal_yaw_link",
+      "body1": "gimbal_pitch_link",
+      "excluded": false,
+      "anchor_error_m": 3.589423007138243e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_thigh_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "base_link",
+      "body1": "right_thigh_link",
+      "excluded": false,
+      "anchor_error_m": 9.978620877297124e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_connect_03_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_thigh_link",
+      "body1": "right_connect_03_link",
+      "excluded": false,
+      "anchor_error_m": 1.915435874181704e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_connect_05_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_thigh_link",
+      "body1": "right_connect_05_link",
+      "excluded": false,
+      "anchor_error_m": 8.404775860968596e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_spring_1_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_thigh_link",
+      "body1": "right_spring_1_link",
+      "excluded": false,
+      "anchor_error_m": 7.553857870852648e-10,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_spring_2_joint",
+      "type": "PhysicsPrismaticJoint",
+      "body0": "right_spring_1_link",
+      "body1": "right_spring_2_link",
+      "excluded": false,
+      "anchor_error_m": 1.0830876131436676e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_leg_1_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "base_link",
+      "body1": "right_leg_1_link",
+      "excluded": false,
+      "anchor_error_m": 7.9464124715354e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_leg_2_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_1_link",
+      "body1": "right_leg_2_link",
+      "excluded": false,
+      "anchor_error_m": 1.9329034685294257e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_leg_3_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_2_link",
+      "body1": "right_leg_3_link",
+      "excluded": false,
+      "anchor_error_m": 2.472387900906322e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_connect_30_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_3_link",
+      "body1": "right_connect_30_link",
+      "excluded": false,
+      "anchor_error_m": 2.4369630644650682e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_leg_4_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_3_link",
+      "body1": "right_leg_4_link",
+      "excluded": false,
+      "anchor_error_m": 4.90991648924851e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_leg_5_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_4_link",
+      "body1": "right_leg_5_link",
+      "excluded": false,
+      "anchor_error_m": 1.8168568841669608e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_spring_3_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_5_link",
+      "body1": "right_spring_3_link",
+      "excluded": false,
+      "anchor_error_m": 2.4972990677242585e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_connect_50_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_5_link",
+      "body1": "right_connect_50_link",
+      "excluded": false,
+      "anchor_error_m": 1.0898603967309294e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_wheel_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "right_leg_5_link",
+      "body1": "right_wheel_link",
+      "excluded": false,
+      "anchor_error_m": 1.2230029479555556e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_thigh_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "base_link",
+      "body1": "left_thigh_link",
+      "excluded": false,
+      "anchor_error_m": 8.725644931130667e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_connect_03_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_thigh_link",
+      "body1": "left_connect_03_link",
+      "excluded": false,
+      "anchor_error_m": 1.915436235918987e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_connect_05_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_thigh_link",
+      "body1": "left_connect_05_link",
+      "excluded": false,
+      "anchor_error_m": 8.403144337808307e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_spring_1_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_thigh_link",
+      "body1": "left_spring_1_link",
+      "excluded": false,
+      "anchor_error_m": 7.895121282107097e-10,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_spring_2_joint",
+      "type": "PhysicsPrismaticJoint",
+      "body0": "left_spring_1_link",
+      "body1": "left_spring_2_link",
+      "excluded": false,
+      "anchor_error_m": 1.0866198889710345e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_leg_1_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "base_link",
+      "body1": "left_leg_1_link",
+      "excluded": false,
+      "anchor_error_m": 8.083410348431121e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_leg_2_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_1_link",
+      "body1": "left_leg_2_link",
+      "excluded": false,
+      "anchor_error_m": 1.9168830713219185e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_leg_3_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_2_link",
+      "body1": "left_leg_3_link",
+      "excluded": false,
+      "anchor_error_m": 2.457897288845643e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_connect_30_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_3_link",
+      "body1": "left_connect_30_link",
+      "excluded": false,
+      "anchor_error_m": 2.4383692512286005e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_leg_4_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_3_link",
+      "body1": "left_leg_4_link",
+      "excluded": false,
+      "anchor_error_m": 4.823041991842322e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_leg_5_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_4_link",
+      "body1": "left_leg_5_link",
+      "excluded": false,
+      "anchor_error_m": 1.8168568841669608e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_spring_3_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_5_link",
+      "body1": "left_spring_3_link",
+      "excluded": false,
+      "anchor_error_m": 2.4790047119992785e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_connect_50_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_5_link",
+      "body1": "left_connect_50_link",
+      "excluded": false,
+      "anchor_error_m": 1.1280231905379093e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_wheel_joint",
+      "type": "PhysicsRevoluteJoint",
+      "body0": "left_leg_5_link",
+      "body1": "left_wheel_link",
+      "excluded": false,
+      "anchor_error_m": 1.2230029479555556e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_1",
+      "type": "PhysicsSphericalJoint",
+      "body0": "right_connect_03_link",
+      "body1": "right_connect_30_link",
+      "excluded": true,
+      "anchor_error_m": 7.083639785854245e-10,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_2",
+      "type": "PhysicsFixedJoint",
+      "body0": "right_spring_2_link",
+      "body1": "right_spring_3_link",
+      "excluded": true,
+      "anchor_error_m": 4.0649489956997144e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "right_3",
+      "type": "PhysicsSphericalJoint",
+      "body0": "right_connect_05_link",
+      "body1": "right_connect_50_link",
+      "excluded": true,
+      "anchor_error_m": 7.636843935010518e-11,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_1",
+      "type": "PhysicsSphericalJoint",
+      "body0": "left_connect_03_link",
+      "body1": "left_connect_30_link",
+      "excluded": true,
+      "anchor_error_m": 7.083639785854245e-10,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_2",
+      "type": "PhysicsFixedJoint",
+      "body0": "left_spring_2_link",
+      "body1": "left_spring_3_link",
+      "excluded": true,
+      "anchor_error_m": 4.0658915803304805e-09,
+      "frame_error_deg": 0.0
+    },
+    {
+      "name": "left_3",
+      "type": "PhysicsSphericalJoint",
+      "body0": "left_connect_50_link",
+      "body1": "left_connect_05_link",
+      "excluded": true,
+      "anchor_error_m": 2.6822088994293836e-10,
+      "frame_error_deg": 0.0
+    }
+  ],
+  "rest_height": 0.372790959,
+  "wheel_radius": 0.060000004,
+  "preserved_code_sha256": {
+    "components/commands.py": "806264daf686757966dec6cfad21176c1884e9ababc27adfc8736a2270e1b0f3",
+    "components/jump.py": "d71d82ded1eebd5b6e3a8ec2945cea34123255b316be241b2c580b7550716964",
+    "components/rewards.py": "7ea2a1a1309b96481bcc2d7bf8619ddaacbd473e85d7dcec35b44039309ebe76",
+    "ppo.py": "f0177573ce738e497279a30eeb9e1573aac303b208b896c2df4af07a2b479e0f"
+  },
+  "validation": "USD geometry/constraint inspection only; no simulator or training started"
+}

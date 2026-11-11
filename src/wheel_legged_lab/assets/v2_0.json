@@ -1,0 +1,142 @@
+{
+  "name": "wheelbipe_v2_0",
+  "usd": "wheelbipe_v2_0.usd",
+  "base_body": "base_link",
+  "wheel_bodies": [
+    "left_wheel_link",
+    "right_wheel_link"
+  ],
+  "termination_bodies": [
+    "base_link",
+    "gimbal_yaw_link",
+    "gimbal_pitch_link"
+  ],
+  "rest_height": 0.372790959,
+  "wheel_radius": 0.060000004,
+  "rest_joint_positions": {
+    "gimbal_yaw_joint": 0.0,
+    "gimbal_pitch_joint": 0.0,
+    "right_thigh_joint": 0.0,
+    "right_connect_03_joint": 0.0,
+    "right_connect_05_joint": 0.0,
+    "right_spring_1_joint": 0.0,
+    "right_spring_2_joint": 0.0,
+    "right_leg_1_joint": 0.0,
+    "right_leg_2_joint": 0.0,
+    "right_leg_3_joint": 0.0,
+    "right_connect_30_joint": 0.0,
+    "right_leg_4_joint": 0.0,
+    "right_leg_5_joint": 0.0,
+    "right_spring_3_joint": 0.0,
+    "right_connect_50_joint": 0.0,
+    "right_wheel_joint": 0.0,
+    "left_thigh_joint": 0.0,
+    "left_connect_03_joint": 0.0,
+    "left_connect_05_joint": 0.0,
+    "left_spring_1_joint": 0.0,
+    "left_spring_2_joint": 0.0,
+    "left_leg_1_joint": 0.0,
+    "left_leg_2_joint": 0.0,
+    "left_leg_3_joint": 0.0,
+    "left_connect_30_joint": 0.0,
+    "left_leg_4_joint": 0.0,
+    "left_leg_5_joint": 0.0,
+    "left_spring_3_joint": 0.0,
+    "left_connect_50_joint": 0.0,
+    "left_wheel_joint": 0.0
+  },
+  "motors": [
+    {
+      "name": "legs",
+      "joints": [
+        "left_leg_1_joint",
+        "left_thigh_joint",
+        "right_leg_1_joint",
+        "right_thigh_joint"
+      ],
+      "mode": "position",
+      "action_scale": 0.5,
+      "kp": 60.0,
+      "kd": 2.0,
+      "effort_limit": 160.0,
+      "speed_limit": 40.1,
+      "armature": 0.015795,
+      "directions": [
+        1,
+        1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "name": "wheels",
+      "joints": [
+        "left_wheel_joint",
+        "right_wheel_joint"
+      ],
+      "mode": "velocity",
+      "action_scale": 10.0,
+      "kp": 0.0,
+      "kd": 0.2,
+      "effort_limit": 5.0,
+      "speed_limit": 60.0,
+      "armature": 0.001,
+      "directions": [
+        1,
+        -1
+      ]
+    }
+  ],
+  "passive_joint_patterns": [
+    "(left|right)_leg_2_joint",
+    "(left|right)_leg_3_joint",
+    "(left|right)_leg_4_joint",
+    "(left|right)_leg_5_joint",
+    "(left|right)_connect_03_joint",
+    "(left|right)_connect_05_joint",
+    "(left|right)_connect_30_joint",
+    "(left|right)_connect_50_joint",
+    "(left|right)_spring_1_joint",
+    "(left|right)_spring_3_joint"
+  ],
+  "spring_joints": [
+    "left_spring_2_joint",
+    "right_spring_2_joint"
+  ],
+  "auxiliary_joints": [
+    "gimbal_yaw_joint",
+    "gimbal_pitch_joint"
+  ],
+  "joint_names": [
+    "gimbal_yaw_joint",
+    "gimbal_pitch_joint",
+    "right_thigh_joint",
+    "right_connect_03_joint",
+    "right_connect_05_joint",
+    "right_spring_1_joint",
+    "right_spring_2_joint",
+    "right_leg_1_joint",
+    "right_leg_2_joint",
+    "right_leg_3_joint",
+    "right_connect_30_joint",
+    "right_leg_4_joint",
+    "right_leg_5_joint",
+    "right_spring_3_joint",
+    "right_connect_50_joint",
+    "right_wheel_joint",
+    "left_thigh_joint",
+    "left_connect_03_joint",
+    "left_connect_05_joint",
+    "left_spring_1_joint",
+    "left_spring_2_joint",
+    "left_leg_1_joint",
+    "left_leg_2_joint",
+    "left_leg_3_joint",
+    "left_connect_30_joint",
+    "left_leg_4_joint",
+    "left_leg_5_joint",
+    "left_spring_3_joint",
+    "left_connect_50_joint",
+    "left_wheel_joint"
+  ]
+}

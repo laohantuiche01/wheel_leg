@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "rigid_bodies": 32,
+  "dof_count": 30,
+  "loop_constraints": 6,
+  "max_anchor_error_m": 9.978620877297124e-09,
+  "wheel_clearances_m": [
+    -7.70999997873334e-09,
+    -7.70999997873334e-09
+  ],
+  "action_directions_verified": true,
+  "joint_ownership_verified": true,
+  "imported_drives_removed": true,
+  "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+  "simulator_started": false,
+  "training_started": false
+}

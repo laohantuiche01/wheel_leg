@@ -1,0 +1,15 @@
+{
+  "source_repository": "/home/rm-nuaa/wheel_leg/wheeled-legged_RL",
+  "source_asset": "source/agent_world/agent_world/assets/usd_files/wheelbipe_v1_0/wheelbipe_v1_0.usd",
+  "sha256": "6d74b6479739010575f94e91b1b5474be650924b34ef06de051935609314d573",
+  "rest_pose_source": "source/agent_world/agent_world/assets/wheelbipe_v1_0.py",
+  "license": "LICENSE",
+  "active_robot": "wheelbipe_v2_0",
+  "v2_source_asset": "model/v2_0.usdz",
+  "v2_source_sha256": "306e5255d85a9022ba5b6f5917d7c653814cdd6d210b0024967a97c284a13358",
+  "v2_converted_asset": "src/wheel_legged_lab/assets/wheelbipe_v2_0.usd",
+  "v2_converted_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+  "v2_robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
+  "v2_robot_spec_sha256": "9f9631ef6778b0237c83ac92b2f45a4ce79d4cb9988e33c8d5a85f15b19ea8a0",
+  "validation": "USD model conversion and static checks completed; no simulator smoke test or training run."
+}
