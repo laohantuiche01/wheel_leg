@@ -4,8 +4,8 @@
 主环境只继承一次 `DirectRLEnv`，任务差异使用配置工厂，控制和扰动使用对象组合。
 源码不导入旧 `agent_tasks`、`agent_world`、V13、V14，也不修改正在运行的旧训练。
 
-**当前状态：已完成 v2 模型适配、USD 离线检查和 7 项 CPU 测试；站立训练的 model_500 已做短时回放诊断，发现机身倾斜及云台 pitch 下垂。**
-实测指标和原因分析见 [站姿诊断](docs/STAND_DIAGNOSIS.md)，完整动力学验证仍未完成。
+**当前状态：已完成 v2 模型适配、USD 离线检查和 11 项 CPU 测试；已加入机身姿态惩罚、云台 pitch 位置保持及姿态日志。**
+原问题的实测指标见 [站姿诊断](docs/STAND_DIAGNOSIS.md)，修改内容与训练方式见 [姿态修正](docs/POSTURE_CONTROL.md)。
 请在运行仿真前按 [后续验证清单](docs/VALIDATION.md) 检查模型闭链、接触和电机方向。这里不承诺已可训练。
 
 ## 代码结构
@@ -21,7 +21,7 @@ src/wheel_legged_lab/
   assets/v1_0.json           旧模型配置，供显式回退
   assets/wheelbipe_v1_0.usd  旧模型的独立副本
   components/
-    motors.py               PositionPD / VelocityPD / DirectTorque / MotorBank / SpringController
+    motors.py               MotorBank / SpringController / AuxiliaryHoldController
     disturbances.py         MassRandomizer / ForceDisturbance
     commands.py             CommandSampler：站立、直行、转弯、原地旋转
     jump.py                 JumpController：起跳、腾空、接触恢复、成功/超时
@@ -85,6 +85,8 @@ Isaac 的策略电机执行器设为零 PD，仅接受力矩前馈，避免双�
 v2 腿/轮沿用旧控制器增益和限幅：腿 60/2、160 Nm；轮 0/0.2、5 Nm。左右关节方向在配置中显式映射到策略坐标，电机延迟按控制步计算。
 弹簧拥有独立控制器，不能再由其他组件重复写同一关节。
 弹簧 `offset=None` 时取各自的模型复位位置，v2 为 0 m，v1 仍为 -0.0482 m；预载、刚度及阻尼沿用。
+云台 pitch 使用独立位置保持（关节相对零位，Kp=120、Kd=3、限幅 8 N·m），不占用策略动作；yaw 仍为被动阻尼。
+着地阶段增加 roll²、pitch² 和 roll/pitch 角速度平方惩罚，权重分别为 -20、-10、-0.2。
 
 ## 更换完整体模型
 
@@ -114,6 +116,8 @@ cd /home/rm-nuaa/wheel_leg/IasscLab
 **不要直接传旧项目 checkpoint**：虽然 Actor 仍为 35 维、Critic 为 60 维，v2 的动作关节和方向已变化，checkpoint 契约会拒绝旧权重。
 本次迁移没有转换网络权重。入口默认使用 v2；显式回退旧模型可加
 `--robot_spec /home/rm-nuaa/wheel_leg/IasscLab/src/wheel_legged_lab/assets/v1_0.json`。
+已有 v2 权重在观测/动作/资产完全匹配、仅辅助控制改变时，可用 `--checkpoint ... --allow_auxiliary_change`
+显式微调；不能同时加 `--resume`。修正后的新权重按默认严格契约正常回放。
 
 注册任务是 `WheelLegged-{Stand,Height,Velocity,Jump}-Direct-v0`。
 包可直接由脚本引入，无需修改旧工程的 PYTHONPATH 或 editable 安装。

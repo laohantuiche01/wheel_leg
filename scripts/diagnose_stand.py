@@ -8,6 +8,7 @@ from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--checkpoint", type=Path, required=True)
+parser.add_argument("--allow_auxiliary_change", action="store_true")
 parser.add_argument("--num_envs", type=int, default=4)
 parser.add_argument("--steps", type=int, default=500)
 parser.add_argument("--seed", type=int, default=42)
@@ -40,7 +41,7 @@ def main():
     env = RslRlVecEnvWrapper(gym.make("WheelLegged-Stand-Direct-v0", cfg=cfg))
     try:
         u = env.unwrapped
-        validate_checkpoint(args.checkpoint, u.observation_schema)
+        validate_checkpoint(args.checkpoint, u.observation_schema, allow_auxiliary_change=args.allow_auxiliary_change)
         agent = WheelLeggedPPORunnerCfg()
         agent.device, agent.seed = args.device, args.seed
         runner = OnPolicyRunner(env, agent.to_dict(), log_dir=None, device=args.device)
@@ -122,7 +123,8 @@ def main():
         report = dict(checkpoint=str(args.checkpoint.resolve()), task="stand", seed=args.seed,
             num_envs=args.num_envs, requested_steps=args.steps, steady_samples=len(samples),
             resets=done_count, yaw_axis_parent=parent, yaw_axis_parent_frame=list(axis),
-            metrics=metrics, training_started=False)
+            metrics=metrics, auxiliary_holds=u.observation_schema["auxiliary_holds"],
+            allow_auxiliary_change=args.allow_auxiliary_change, training_started=False)
         (args.output_dir / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps(report, indent=2))
     finally:

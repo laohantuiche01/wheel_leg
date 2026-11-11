@@ -10,6 +10,6 @@
   "v2_converted_asset": "src/wheel_legged_lab/assets/wheelbipe_v2_0.usd",
   "v2_converted_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
   "v2_robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
-  "v2_robot_spec_sha256": "9f9631ef6778b0237c83ac92b2f45a4ce79d4cb9988e33c8d5a85f15b19ea8a0",
+  "v2_robot_spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e",
   "validation": "USD model conversion and static checks completed; no simulator smoke test or training run."
 }

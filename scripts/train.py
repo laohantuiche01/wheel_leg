@@ -14,11 +14,15 @@ parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--robot_spec", type=str)
 parser.add_argument("--checkpoint", type=Path)
 parser.add_argument("--resume", action="store_true")
+parser.add_argument("--allow_auxiliary_change", action="store_true",
+                    help="Explicitly fine-tune matching v2 weights after changing auxiliary joint control")
 parser.add_argument("--mass_randomization", action="store_true")
 parser.add_argument("--pushes", action="store_true")
 parser.add_argument("--log_root", type=Path, default=bootstrap.ROOT / "logs")
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
+if args.allow_auxiliary_change and (args.resume or not args.checkpoint):
+    parser.error("--allow_auxiliary_change requires --checkpoint and cannot be used with --resume")
 app = AppLauncher(args).app
 
 import gymnasium as gym
@@ -53,7 +57,7 @@ def main():
         (log / "launch.json").write_text(json.dumps(vars(args), default=str, indent=2) + "\n")
         runner = OnPolicyRunner(env, agent.to_dict(), log_dir=str(log), device=args.device)
         if args.checkpoint:
-            validate_checkpoint(args.checkpoint, schema)
+            validate_checkpoint(args.checkpoint, schema, allow_auxiliary_change=args.allow_auxiliary_change)
             runner.load(str(args.checkpoint), load_optimizer=args.resume, map_location=args.device)
             if args.resume:
                 runner.current_learning_iteration += 1

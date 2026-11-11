@@ -66,7 +66,7 @@ for name, key in (("source", "v2_source_sha256"), ("asset", "v2_converted_sha256
         errors.append(f"Asset provenance disagrees with v2 migration: {key}")
 for name, checksum in migration["preserved_code_sha256"].items():
     if hashlib.sha256((PACKAGE / name).read_bytes()).hexdigest() != checksum:
-        errors.append(f"Preserved scheduling/reward/PPO code changed: {name}")
+        errors.append(f"Preserved scheduling/PPO code changed: {name}")
 if len(model["joint_names"]) != migration["dof_count"] or set(model["joint_names"]) != set(model["rest_joint_positions"]):
     errors.append("v2 rest pose must explicitly cover all articulation DOFs")
 with (ROOT / "pyproject.toml").open("rb") as stream:

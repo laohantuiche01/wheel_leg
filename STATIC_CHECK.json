@@ -1,8 +1,8 @@
 {
   "status": "pass",
   "checks": "AST, import paths, inheritance, reward keys, JSON/TOML, v1/v2 checksums, preserved scheduling/PPO, v2 rest coverage",
-  "python_files": 25,
-  "python_lines": 1786,
+  "python_files": 26,
+  "python_lines": 2004,
   "environment_class": "WheelLeggedEnv(DirectRLEnv)",
   "action_count": 6,
   "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",

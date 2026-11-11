@@ -7,6 +7,8 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--task", choices=("stand", "height", "velocity", "jump"), default="velocity")
 parser.add_argument("--checkpoint", type=Path, required=True)
+parser.add_argument("--allow_auxiliary_change", action="store_true",
+                    help="Explicitly evaluate matching v2 weights with changed auxiliary joint control")
 parser.add_argument("--num_envs", type=int, default=1)
 parser.add_argument("--steps", type=int, default=1000)
 parser.add_argument("--robot_spec", type=str)
@@ -37,7 +39,7 @@ def main():
     env = RslRlVecEnvWrapper(gym.make(f"WheelLegged-{args.task.title()}-Direct-v0", cfg=cfg))
     try:
         u = env.unwrapped
-        validate_checkpoint(args.checkpoint, u.observation_schema)
+        validate_checkpoint(args.checkpoint, u.observation_schema, allow_auxiliary_change=args.allow_auxiliary_change)
         runner = OnPolicyRunner(env, WheelLeggedPPORunnerCfg().to_dict(), log_dir=None, device=args.device)
         runner.load(str(args.checkpoint), load_optimizer=False, map_location=args.device)
         policy = runner.get_inference_policy(device=args.device)

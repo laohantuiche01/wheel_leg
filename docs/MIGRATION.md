@@ -23,7 +23,7 @@
 | 观测 | Actor 35 / Critic 60，显式动作顺序；旧 Critic 为 78 |
 | 随机化 | 质量/外力默认关闭，需明确打开；没有隐式继承旧 EventCfg |
 | 弹簧 | 单一控制器，当前名义线性曲线与总阻尼集中配置，无隐藏力叠加 |
-| 云台 | 当前为被动阻尼，不再随机采样偏航速度；可转为策略电机组 |
+| 云台 | yaw 为被动阻尼，pitch 使用独立零位 PD 保持；均不占用六维策略动作 |
 | 跳跃 | 独立数据组件；不调用旧 jump_takeoff.py，也没有辅助抬升 |
 | 日志 | 用实际回合时长归一化，不能直接与旧 reward 数值横向比较 |
 
@@ -40,7 +40,7 @@
 | `left_wheel_joint` | `left_wheel_joint` | +1 |
 | `right_wheel_joint` | `right_wheel_joint` | -1 |
 
-v2 的弹簧自由度是 `left_spring_2_joint` / `right_spring_2_joint` 两个移动关节；云台偏航和俯仰关节都由辅助阻尼执行器拥有。其余 20 个可动连杆关节归入被动组。6 个闭链约束不计入 articulation 的 30 个策略/辅助自由度，模型转换时保留为 PhysX 闭链约束。零位姿基于 CAD 中各连接锚点一致的姿态，机器人根改为 `base_link`，地面轮底高度对应 `rest_height=0.372790959 m`。
+v2 的弹簧自由度是 `left_spring_2_joint` / `right_spring_2_joint` 两个移动关节；云台 yaw 为辅助阻尼，pitch 为辅助位置保持。其余 20 个可动连杆关节归入被动组。6 个闭链约束不计入 articulation 的 30 个策略/辅助自由度，模型转换时保留为 PhysX 闭链约束。零位姿基于 CAD 中各连接锚点一致的姿态，机器人根改为 `base_link`，地面轮底高度对应 `rest_height=0.372790959 m`。
 
 `CommandSampler` 的速度/转向命令混合采样和 `JumpController` 的自动触发、起跳、落地阶段调度沿用原实现，没有因关节重命名而改变。v2 的关节动作方向加入观测和 checkpoint 契约，因此 v1 checkpoint 不可直接加载。
 
@@ -59,19 +59,20 @@ v2 的弹簧自由度是 `left_spring_2_joint` / `right_spring_2_joint` 两个�
 站立高度取模型的 `rest_height`；height、velocity、jump 的命令范围和时序沿用，其实际可达性待仿真检查。
 弹簧 `offset=None` 时压缩参考取各自的模型复位位置：v2 为 0，v1 为 -0.0482 m。
 原预载 400 N、刚度约 2857.14 N/m、阻尼 50 保留，可显式设置 offset 覆盖。
-新辅助云台 pitch 沿用被动阻尼，不占用动作维度。
+初次迁移的云台 pitch 为被动阻尼；站姿诊断后按用户要求改为独立位置保持，不占用动作维度。
 
 观测契约升级为 `wheel-legged-composition-v2`，额外记录方向、站高、轮半径及弹簧配置。
 没有转换旧神经网络权重；相同输入输出维度不能证明权重可复用。
-`components/commands.py`、`components/jump.py`、`components/rewards.py` 和 `ppo.py` 的内容及哈希保持不变；
+`components/commands.py`、`components/jump.py` 和 `ppo.py` 的内容及哈希保持不变；
 环境生命周期的调度顺序、控制步 0.02 s、物理步 0.005 s 也保持原样。
+`components/rewards.py` 已按后续授权加入姿态项及指标，初始版本哈希保存在 `MODEL_MIGRATION.json` 的 `posture_update` 中。
 
 ### 重建
 
 在工程根目录用现有 Python 执行 `scripts/migrate_v2_model.py`，可由 `model/v2_0.usdz` 重新生成
 v2 USD、JSON 和 `MODEL_MIGRATION.json`。原 USDZ 不会被修改；重建会覆盖生成配置，手工调整过时需先保留修改。
 脚本只加载独立 USD 库，不启动 Kit，也不安装依赖。重建后执行 README 中的三条验证命令。
-已通过 USD 离线检查和 7 项 CPU 测试，尚未进行仿真或训练。
+已通过 USD 离线检查和 11 项 CPU 测试，并完成短时回放；后续姿态修改见 [POSTURE_CONTROL.md](POSTURE_CONTROL.md)。
 
 ## 此版未迁移
 

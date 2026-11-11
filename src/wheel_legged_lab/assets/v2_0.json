@@ -138,5 +138,14 @@
     "left_spring_3_joint",
     "left_connect_50_joint",
     "left_wheel_joint"
-  ]
+  ],
+  "auxiliary_holds": {
+    "gimbal_pitch_joint": {
+      "target": 0.0,
+      "kp": 120.0,
+      "kd": 3.0,
+      "effort_limit": 8.0,
+      "speed_limit": 6.0
+    }
+  }
 }

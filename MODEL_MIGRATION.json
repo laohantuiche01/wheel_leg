@@ -4,7 +4,7 @@
   "asset": "src/wheel_legged_lab/assets/wheelbipe_v2_0.usd",
   "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
   "spec": "src/wheel_legged_lab/assets/v2_0.json",
-  "spec_sha256": "9f9631ef6778b0237c83ac92b2f45a4ce79d4cb9988e33c8d5a85f15b19ea8a0",
+  "spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e",
   "base_translation_removed": [
     0.17020701599000002,
     -0.005903785705000001,
@@ -386,8 +386,12 @@
   "preserved_code_sha256": {
     "components/commands.py": "806264daf686757966dec6cfad21176c1884e9ababc27adfc8736a2270e1b0f3",
     "components/jump.py": "d71d82ded1eebd5b6e3a8ec2945cea34123255b316be241b2c580b7550716964",
-    "components/rewards.py": "7ea2a1a1309b96481bcc2d7bf8619ddaacbd473e85d7dcec35b44039309ebe76",
     "ppo.py": "f0177573ce738e497279a30eeb9e1573aac303b208b896c2df4af07a2b479e0f"
   },
-  "validation": "USD geometry/constraint inspection only; no simulator or training started"
+  "validation": "USD geometry/constraint inspection only; no simulator or training started",
+  "posture_update": {
+    "date": "2026-11-11",
+    "initial_rewards_sha256": "7ea2a1a1309b96481bcc2d7bf8619ddaacbd473e85d7dcec35b44039309ebe76",
+    "description": "User-authorized posture penalties and gimbal pitch position hold; command/jump/PPO scheduling unchanged."
+  }
 }

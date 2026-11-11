@@ -119,6 +119,7 @@ def main():
         termination_bodies=["base_link", "gimbal_yaw_link", "gimbal_pitch_link"],
         spring_joints=["left_spring_2_joint", "right_spring_2_joint"],
         auxiliary_joints=["gimbal_yaw_joint", "gimbal_pitch_joint"],
+        auxiliary_holds={"gimbal_pitch_joint": dict(target=0.0, kp=120.0, kd=3.0, effort_limit=8.0, speed_limit=6.0)},
         passive_joint_patterns=[f"(left|right)_{part}_joint" for part in
             ("leg_2", "leg_3", "leg_4", "leg_5", "connect_03", "connect_05", "connect_30", "connect_50", "spring_1", "spring_3")])
     spec["motors"][0]["joints"] = ["left_leg_1_joint", "left_thigh_joint", "right_leg_1_joint", "right_thigh_joint"]
@@ -133,7 +134,7 @@ def main():
         loop_constraint_count=len(closures), joints=joint_report,
         rest_height=spec["rest_height"], wheel_radius=spec["wheel_radius"],
         preserved_code_sha256={name: digest(ROOT / "src/wheel_legged_lab" / name) for name in
-            ("components/commands.py", "components/jump.py", "components/rewards.py", "ppo.py")},
+            ("components/commands.py", "components/jump.py", "ppo.py")},
         validation="USD geometry/constraint inspection only; no simulator or training started")
     (ROOT / "MODEL_MIGRATION.json").write_text(json.dumps(report, indent=2) + "\n")
     provenance_path = ROOT / "ASSET_PROVENANCE.json"
