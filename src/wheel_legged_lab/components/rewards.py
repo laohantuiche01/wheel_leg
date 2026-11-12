@@ -19,6 +19,12 @@ class RewardModel:
         push = (jump.phase == jump.PUSH).float()
         upright = (-state.gravity[:, 2]).clamp(0., 1.)
         roll, pitch = body_tilt_angles(state.gravity)
+        second_diff = motors.actions - 2 * motors.previous + getattr(motors, "before_previous", motors.previous)
+        if hasattr(motors, "robot"):
+            velocity = motors.robot.data.joint_vel[:, motors.ids] * motors.directions
+            wheel_power = (motors.effort * velocity)[:, ~motors.position_mask].clamp(min=0).sum(dim=1)
+        else:
+            wheel_power = torch.zeros_like(state.height)
         terms = {
             "velocity": torch.exp(-vx_error.square()), "velocity_error": vx_error.square(),
             "yaw": torch.exp(-yaw_error.square() / .5), "yaw_error": yaw_error.square(),
@@ -30,6 +36,7 @@ class RewardModel:
             "vertical_velocity": ground_phase * state.vertical_velocity.square(),
             "torque": motors.effort.square().sum(dim=1),
             "action_rate": (motors.actions - motors.previous).square().sum(dim=1),
+            "action_smoothness": second_diff.square().sum(dim=1), "wheel_power": wheel_power,
             "termination": terminated.float(),
             "jump_push_velocity": push * torch.exp(-(state.vertical_velocity - reference_velocity).square() / .5),
             "jump_push_height": push * torch.exp(-(state.height - reference_height).square() / .003),

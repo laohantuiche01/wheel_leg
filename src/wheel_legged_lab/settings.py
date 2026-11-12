@@ -8,8 +8,20 @@ ASSET_DIR = Path(__file__).resolve().parent / "assets"
 class MotorSettings:
     action_clip: float = 10.0
     delay_steps: tuple[int, int] = (0, 0)  # sampled per episode, CONTROL steps
+    delay_clock: str = "control"
     strength_range: tuple[float, float] = (1.0, 1.0)
     use_torque_speed_envelope: bool = False
+    action_filter_alpha: float = 1.0  # new action weight; old optional EMA used 0.8
+    velocity_feedback: str = "simulator"  # or finite_difference, sampled at physics rate
+    velocity_filter_alpha: float = 1.0
+    torque_speed_curves: dict[str, list[list[float]]] = field(default_factory=dict)  # output rad/s, Nm
+
+@dataclass
+class TerminationSettings:
+    duration_steps: int = 1
+    joint_speed_limit: float = 500.0
+    root_linear_speed_limit: float = 100.0
+    root_angular_speed_limit: float = 200.0
 
 @dataclass
 class MassSettings:
@@ -79,6 +91,8 @@ class ObservationSettings:
     angular_velocity_scale: float = 0.25
     joint_velocity_scale: float = 0.05
     clip: float = 100.0
+    actor_history: int = 1
+    actor_delay: int = 0  # control frames; separate from history length
 
 @dataclass
 class RewardSettings:
@@ -89,6 +103,7 @@ class RewardSettings:
         "upright": 1.0, "vertical_velocity": -0.5,
         "roll_error": -20.0, "pitch_error": -10.0, "roll_pitch_rate": -0.2,
         "torque": -0.0001, "action_rate": -0.01,
+        "action_smoothness": 0.0, "wheel_power": 0.0,
         "termination": -10.0,
         "jump_push_velocity": 4.0, "jump_push_height": 2.0,
         "jump_airtime": 3.0, "jump_peak": 50.0, "jump_success": 100.0,
@@ -106,15 +121,33 @@ class TaskSettings:
     jump: JumpSettings = field(default_factory=JumpSettings)
     observations: ObservationSettings = field(default_factory=ObservationSettings)
     rewards: RewardSettings = field(default_factory=RewardSettings)
+    termination: TerminationSettings = field(default_factory=TerminationSettings)
     reset_yaw_range: tuple[float, float] = (-3.14159265, 3.14159265)
+    reset_linear_velocity_range: tuple[float, float] = (0.0, 0.0)  # world xyz, m/s
+    reset_angular_velocity_range: tuple[float, float] = (0.0, 0.0)  # world xyz, rad/s
     termination_tilt_deg: float = 40.0
     contact_force_threshold: float = 5.0
 
     def validate(self):
+        if not 0 < self.motors.action_filter_alpha <= 1 or not 0 < self.motors.velocity_filter_alpha <= 1:
+            raise ValueError("Filter coefficients must lie in (0, 1]")
+        if self.motors.velocity_feedback not in ("simulator", "finite_difference"):
+            raise ValueError("Unsupported motor velocity feedback")
+        if self.motors.delay_clock not in ("control", "physics"):
+            raise ValueError("Unsupported motor delay clock")
+        if int(self.observations.actor_delay) != self.observations.actor_delay or self.observations.actor_delay < 0:
+            raise ValueError("Observation delay must be a nonnegative integer")
+        for count in (self.observations.actor_history, self.termination.duration_steps):
+            if isinstance(count, bool) or int(count) != count or count < 1:
+                raise ValueError("History and termination lengths must be positive integers")
+        if min(self.termination.joint_speed_limit, self.termination.root_linear_speed_limit,
+               self.termination.root_angular_speed_limit) <= 0:
+            raise ValueError("Termination speed limits must be positive")
         ranges = (self.motors.delay_steps, self.motors.strength_range, self.mass.scale_range,
                   self.force.interval_s, self.force.duration_s, self.commands.vx,
                   self.commands.wz, self.commands.height, self.commands.interval_s,
-                  self.jump.peak_height, self.reset_yaw_range, self.spring.noise_range)
+                  self.jump.peak_height, self.reset_yaw_range, self.spring.noise_range,
+                  self.reset_linear_velocity_range, self.reset_angular_velocity_range)
         if any(len(r) != 2 or r[0] > r[1] for r in ranges):
             raise ValueError("Ranges must be ordered pairs")
         if self.motors.delay_steps[0] < 0 or any(int(x) != x for x in self.motors.delay_steps):
@@ -135,7 +168,7 @@ class TaskSettings:
         if self.jump.timeout_s <= self.jump.max_push_s + self.jump.stable_landing_s:
             raise ValueError("Jump timeout must leave time for landing")
 
-def settings_for(task: str, robot_file: str | None = None) -> TaskSettings:
+def settings_for(task: str, robot_file: str | None = None, strategy: str = "baseline") -> TaskSettings:
     from .robot import RobotDescription
     s = TaskSettings(task=task)
     if robot_file is not None:
@@ -153,5 +186,14 @@ def settings_for(task: str, robot_file: str | None = None) -> TaskSettings:
     if task == "jump":
         s.commands.height = (0.28, 0.28)
         s.jump.enabled = True
+    if strategy == "legacy_ppo":
+        s.motors.action_filter_alpha = 0.8
+        s.motors.velocity_feedback = "finite_difference"
+        s.termination.duration_steps = 20
+        s.motors.delay_steps = (1, 3)
+        s.motors.delay_clock = "physics"
+        s.observations.actor_delay = 1
+    elif strategy != "baseline":
+        raise ValueError(f"Unknown strategy: {strategy}")
     s.validate()
     return s

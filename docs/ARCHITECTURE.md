@@ -38,6 +38,7 @@ flowchart TD
 `auxiliary_holds` 中的关节仅由 `AuxiliaryHoldController` 写，Isaac 执行器为零 PD；其余辅助关节仍由阻尼执行器处理。
 外部 wrench 只能由 `ForceDisturbance` 写；后续加入第二种扰动时，应先组合再统一提交。
 质量和惯量只能由 `MassRandomizer` 修改；名义值保留不变。
+可选 `legacy_ppo` 控制机制见 [普通 PPO 迁移](LEGACY_PPO_MIGRATION.md)。动作 EMA 在控制步执行，物理延迟及差分电机反馈在物理步执行。
 
 ## 机器人索引
 
@@ -52,6 +53,7 @@ v2 的 30 个 DOF 由 `joint_names` 明确列出；所有关节必须有唯一�
 受控关节数记为 A。
 
 - Actor：`17 + 3A`。当前 A=6，对应 35 维。
+- 可选 Actor 历史长度 H：策略输入为 `H × (17 + 3A)`；观测延迟不增加输入维度，Critic 保持当前帧。
 - Critic：`30 + 5A`。当前为 60 维。
 - Critic 额外看到真实速度、机身高度、双轮接触、电机力矩、质量缩放、外力和电机强度。
 - Actor 的速度控制关节位置置零；当前轮子不使用无限累积转角。

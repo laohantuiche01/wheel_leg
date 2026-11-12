@@ -18,6 +18,7 @@ from .components.observations import ObservationBuilder, observation_schema
 from .components.reset import ResetController
 from .components.rewards import RewardModel
 from .components.state import StateReader
+from .components.legacy_control import SustainedTermination
 
 class WheelLeggedEnv(DirectRLEnv):
     cfg: WheelLeggedEnvCfg
@@ -29,7 +30,8 @@ class WheelLeggedEnv(DirectRLEnv):
         self.description = RobotDescription.load(s.robot_file)
         self.binding = RobotBinding(self.robot, self.contact_sensor, self.description)
         n, device = self.num_envs, self.device
-        self.motors = MotorBank(self.robot, self.binding, self.description, s.motors, n, device)
+        self.motors = MotorBank(self.robot, self.binding, self.description, s.motors, n, device, self.physics_dt)
+        self.termination = SustainedTermination(s.termination, n, device)
         self.springs = SpringController(self.robot, self.binding, s.spring, n, device)
         self.auxiliary_holds = AuxiliaryHoldController(self.robot, self.binding, self.description, n, device)
         self.mass = MassRandomizer(self.robot, s.mass, n, device)
@@ -50,7 +52,7 @@ class WheelLeggedEnv(DirectRLEnv):
         self.springs.reset(self._all_ids)
         self.force.reset(self._all_ids)
         self.commands.reset(self._all_ids)
-        self.observation_schema = observation_schema(self.description)
+        self.observation_schema = observation_schema(self.description, s.observations)
         self.observation_schema.update(
             asset_sha256=hashlib.sha256(Path(self.description.usd).read_bytes()).hexdigest(),
             observation_settings=asdict(s.observations),
@@ -59,6 +61,10 @@ class WheelLeggedEnv(DirectRLEnv):
             spring_settings=asdict(s.spring),
             auxiliary_holds={name: asdict(hold) for name, hold in self.description.auxiliary_holds.items()},
             motor_groups=[asdict(group) for group in self.description.motors])
+        # Baseline defaults remain compatible with already validated v2 weights.
+        from .settings import MotorSettings
+        if asdict(s.motors) != asdict(MotorSettings()):
+            self.observation_schema["motor_settings"] = asdict(s.motors)
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -93,7 +99,13 @@ class WheelLeggedEnv(DirectRLEnv):
     def _get_dones(self):
         state = self._finish_step()
         tilt_limit = math.cos(math.radians(self.cfg.settings.termination_tilt_deg))
-        terminate = ~state.finite | state.forbidden_contact | (-state.gravity[:, 2] < tilt_limit)
+        cfg = self.cfg.settings.termination
+        immediate = (~state.finite
+            | (self.robot.data.joint_vel[:, self.binding.action_ids].abs().amax(dim=1) > cfg.joint_speed_limit)
+            | (state.linear_velocity.abs().amax(dim=1) > cfg.root_linear_speed_limit)
+            | (state.angular_velocity.abs().amax(dim=1) > cfg.root_angular_speed_limit))
+        ordinary = state.forbidden_contact | (-state.gravity[:, 2] < tilt_limit)
+        terminate = self.termination.update(ordinary, immediate, self.common_step_counter).clone()
         timeout = self.episode_length_buf >= self.max_episode_length - 1
         return terminate, timeout
 
@@ -107,7 +119,7 @@ class WheelLeggedEnv(DirectRLEnv):
         return self._reward
 
     def _get_observations(self):
-        return self.observations.build(self.reader.read())
+        return self.observations.build(self.reader.read(), self.common_step_counter)
 
     def _reset_idx(self, env_ids):
         if env_ids is None:
@@ -127,6 +139,8 @@ class WheelLeggedEnv(DirectRLEnv):
         self.motors.reset(env_ids)
         self.springs.reset(env_ids)
         self.auxiliary_holds.reset(env_ids)
+        self.termination.reset(env_ids)
+        self.observations.reset(env_ids)
         self.commands.reset(env_ids)
         self.jump.reset(env_ids)
         self.force.reset(env_ids)

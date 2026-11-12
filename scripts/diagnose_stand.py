@@ -9,6 +9,9 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--checkpoint", type=Path, required=True)
 parser.add_argument("--allow_auxiliary_change", action="store_true")
+parser.add_argument("--strategy", choices=("baseline", "legacy_ppo"), default="baseline")
+parser.add_argument("--actor_history", type=int, default=1)
+parser.add_argument("--motor_curves", type=Path)
 parser.add_argument("--num_envs", type=int, default=4)
 parser.add_argument("--steps", type=int, default=500)
 parser.add_argument("--seed", type=int, default=42)
@@ -34,7 +37,10 @@ from wheel_legged_lab.checkpoints import validate_checkpoint
 
 
 def main():
-    settings = settings_for("stand")
+    settings = settings_for("stand", strategy=args.strategy)
+    settings.observations.actor_history = args.actor_history
+    if args.motor_curves:
+        settings.motors.torque_speed_curves = json.loads(args.motor_curves.read_text())
     settings.observations.noise_enabled = False
     cfg = WheelLeggedEnvCfg(settings=settings)
     cfg.scene.num_envs, cfg.sim.device, cfg.seed = args.num_envs, args.device, args.seed
@@ -123,7 +129,7 @@ def main():
         report = dict(checkpoint=str(args.checkpoint.resolve()), task="stand", seed=args.seed,
             num_envs=args.num_envs, requested_steps=args.steps, steady_samples=len(samples),
             resets=done_count, yaw_axis_parent=parent, yaw_axis_parent_frame=list(axis),
-            metrics=metrics, auxiliary_holds=u.observation_schema["auxiliary_holds"],
+            metrics=metrics, strategy=args.strategy, auxiliary_holds=u.observation_schema["auxiliary_holds"],
             allow_auxiliary_change=args.allow_auxiliary_change, training_started=False)
         (args.output_dir / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps(report, indent=2))

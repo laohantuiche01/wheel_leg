@@ -28,7 +28,7 @@ class WheelLeggedEnvCfg(DirectRLEnvCfg):
         self.settings.validate()
         spec = RobotDescription.load(self.settings.robot_file)
         self.robot_cfg = spec.build_articulation()
-        schema = observation_schema(spec)
+        schema = observation_schema(spec, self.settings.observations)
         self.action_space = len(spec.action_names)
         self.observation_space = schema["actor_dim"]
         self.state_space = schema["critic_dim"]

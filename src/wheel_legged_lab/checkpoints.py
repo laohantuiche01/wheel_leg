@@ -17,6 +17,9 @@ def validate_checkpoint(path, schema, *, allow_auxiliary_change=False):
     # Noise can be disabled during deterministic evaluation without changing layout.
     for value in (expected, actual):
         value.get("observation_settings", {}).pop("noise_enabled", None)
+        if "observation_settings" in value:
+            value["observation_settings"].setdefault("actor_history", 1)
+            value["observation_settings"].setdefault("actor_delay", 0)
     # Old v2 manifests used passive damping for every auxiliary joint. This is
     # the only controlled compatibility exception: asset/actions/observations
     # must still match exactly before old weights can seed the new controller.

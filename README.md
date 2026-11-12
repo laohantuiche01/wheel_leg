@@ -4,8 +4,9 @@
 主环境只继承一次 `DirectRLEnv`，任务差异使用配置工厂，控制和扰动使用对象组合。
 源码不导入旧 `agent_tasks`、`agent_world`、V13、V14，也不修改正在运行的旧训练。
 
-**当前状态：已完成 v2 模型适配、USD 离线检查和 11 项 CPU 测试；已加入机身姿态惩罚、云台 pitch 位置保持及姿态日志。**
+**当前状态：已完成 v2 模型适配、USD 离线检查和 19 项 CPU 测试；已加入机身姿态修正及可选的旧普通 PPO 控制/训练机制。**
 原问题的实测指标见 [站姿诊断](docs/STAND_DIAGNOSIS.md)，修改内容与训练方式见 [姿态修正](docs/POSTURE_CONTROL.md)。
+新迁移机制、配置和训练命令见 [普通 PPO 迁移说明](docs/LEGACY_PPO_MIGRATION.md)。默认 `baseline` 保留已验证行为；用 `--strategy legacy_ppo` 启用新适配配置。
 请在运行仿真前按 [后续验证清单](docs/VALIDATION.md) 检查模型闭链、接触和电机方向。这里不承诺已可训练。
 
 ## 代码结构

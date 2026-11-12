@@ -1,5 +1,6 @@
 """Deterministic playback; exposes task commands without the legacy keyboard code."""
 import argparse
+import json
 from pathlib import Path
 import bootstrap
 from isaaclab.app import AppLauncher
@@ -12,6 +13,9 @@ parser.add_argument("--allow_auxiliary_change", action="store_true",
 parser.add_argument("--num_envs", type=int, default=1)
 parser.add_argument("--steps", type=int, default=1000)
 parser.add_argument("--robot_spec", type=str)
+parser.add_argument("--strategy", choices=("baseline", "legacy_ppo"), default="baseline")
+parser.add_argument("--actor_history", type=int, default=1)
+parser.add_argument("--motor_curves", type=Path)
 parser.add_argument("--vx", type=float, default=0.0)
 parser.add_argument("--wz", type=float, default=0.0)
 parser.add_argument("--command_height", type=float, help="Robot target height in meters (not the render/window height)")
@@ -31,7 +35,10 @@ from wheel_legged_lab.ppo import WheelLeggedPPORunnerCfg
 from wheel_legged_lab.checkpoints import validate_checkpoint
 
 def main():
-    settings = settings_for(args.task, args.robot_spec)
+    settings = settings_for(args.task, args.robot_spec, args.strategy)
+    settings.observations.actor_history = args.actor_history
+    if args.motor_curves:
+        settings.motors.torque_speed_curves = json.loads(args.motor_curves.read_text())
     settings.observations.noise_enabled = False
     settings.jump.automatic = False
     cfg = WheelLeggedEnvCfg(settings=settings)

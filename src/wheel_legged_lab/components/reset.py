@@ -13,6 +13,10 @@ class ResetController:
         zeros = torch.zeros_like(yaw)
         root[:, 3:7] = quat_from_euler_xyz(zeros, zeros, yaw)
         root[:, 7:] = 0
+        if self.cfg.reset_linear_velocity_range != (0.0, 0.0):
+            root[:, 7:10].uniform_(*self.cfg.reset_linear_velocity_range)
+        if self.cfg.reset_angular_velocity_range != (0.0, 0.0):
+            root[:, 10:13].uniform_(*self.cfg.reset_angular_velocity_range)
         q = self.robot.data.default_joint_pos[ids].clone()
         qd = torch.zeros_like(q)
         self.robot.write_root_pose_to_sim(root[:, :7], env_ids=ids)
