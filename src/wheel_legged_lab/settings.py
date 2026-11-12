@@ -99,9 +99,11 @@ class RewardSettings:
     weights: dict[str, float] = field(default_factory=lambda: {
         "velocity": 2.0, "velocity_error": -0.25,
         "yaw": 1.5, "yaw_error": -0.25,
-        "height": 1.0, "height_error": -20.0,
+        "height": 1.0, "height_error": -80.0,
         "upright": 1.0, "vertical_velocity": -0.5,
         "roll_error": -20.0, "pitch_error": -10.0, "roll_pitch_rate": -0.2,
+        "wheel_stagger": -50.0, "double_support": 2.0,
+        "standing_wheel_clearance": -80.0, "non_wheel_contact": -2.0,
         "torque": -0.0001, "action_rate": -0.01,
         "action_smoothness": 0.0, "wheel_power": 0.0,
         "termination": -10.0,

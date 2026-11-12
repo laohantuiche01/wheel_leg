@@ -7,7 +7,7 @@ class RewardModel:
         self.weights = dict(cfg.weights)
         self.sums = {name: torch.zeros(n, device=device) for name in self.weights}
         self.metric_sums = {name: torch.zeros(n, device=device) for name in
-            ("RollRMSDeg", "PitchRMSDeg", "TiltRMSDeg", "WheelHeightDiffRMSM", "BothWheelsContactFraction")}
+            ("RollRMSDeg", "PitchRMSDeg", "TiltRMSDeg", "WheelHeightDiffRMSM", "WheelStaggerRMSM", "BothWheelsContactFraction")}
         self.metric_time = torch.zeros(n, device=device)
 
     def compute(self, state, commands, motors, jump, terminated, dt):
@@ -19,6 +19,11 @@ class RewardModel:
         push = (jump.phase == jump.PUSH).float()
         upright = (-state.gravity[:, 2]).clamp(0., 1.)
         roll, pitch = body_tilt_angles(state.gravity)
+        stagger = getattr(state, "wheel_fore_aft_difference", None)
+        stagger = torch.zeros_like(state.height) if stagger is None else stagger
+        standing = ground_phase * (commands.velocity.abs().amax(dim=1) < 0.1).float()
+        non_wheel = getattr(state, "non_wheel_contact", None)
+        non_wheel = torch.zeros_like(state.height) if non_wheel is None else non_wheel.float()
         second_diff = motors.actions - 2 * motors.previous + getattr(motors, "before_previous", motors.previous)
         if hasattr(motors, "robot"):
             velocity = motors.robot.data.joint_vel[:, motors.ids] * motors.directions
@@ -33,6 +38,10 @@ class RewardModel:
             "roll_error": ground_phase * roll.square(),
             "pitch_error": ground_phase * pitch.square(),
             "roll_pitch_rate": ground_phase * state.angular_velocity[:, :2].square().sum(dim=1),
+            "wheel_stagger": standing * stagger.square(),
+            "double_support": standing * state.wheel_contact.all(dim=1).float(),
+            "standing_wheel_clearance": standing * state.wheel_clearance.clamp(min=0).square().sum(dim=1),
+            "non_wheel_contact": non_wheel,
             "vertical_velocity": ground_phase * state.vertical_velocity.square(),
             "torque": motors.effort.square().sum(dim=1),
             "action_rate": (motors.actions - motors.previous).square().sum(dim=1),
@@ -59,6 +68,7 @@ class RewardModel:
         metrics = dict(RollRMSDeg=roll.rad2deg().square(), PitchRMSDeg=pitch.rad2deg().square(),
             TiltRMSDeg=torch.acos((-state.gravity[:, 2]).clamp(-1, 1)).rad2deg().square(),
             WheelHeightDiffRMSM=(state.wheel_clearance[:, 0] - state.wheel_clearance[:, 1]).square(),
+            WheelStaggerRMSM=stagger.square(),
             BothWheelsContactFraction=state.wheel_contact.all(dim=1).float())
         for name, value in metrics.items():
             self.metric_sums[name] += torch.where(state.finite, torch.nan_to_num(value), 0.0) * dt
