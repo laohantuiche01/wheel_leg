@@ -2,6 +2,8 @@
 import argparse
 from datetime import datetime
 import json
+import sys
+import traceback
 from pathlib import Path
 import bootstrap
 from isaaclab.app import AppLauncher
@@ -20,13 +22,15 @@ parser.add_argument("--checkpoint", type=Path)
 parser.add_argument("--resume", action="store_true")
 parser.add_argument("--allow_auxiliary_change", action="store_true",
                     help="Explicitly fine-tune matching v2 weights after changing auxiliary joint control")
+parser.add_argument("--allow_control_change", action="store_true",
+                    help="Fine-tune matching action/observation layouts across motor-processing or sensor-delay changes")
 parser.add_argument("--mass_randomization", action="store_true")
 parser.add_argument("--pushes", action="store_true")
 parser.add_argument("--log_root", type=Path, default=bootstrap.ROOT / "logs")
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
-if args.allow_auxiliary_change and (args.resume or not args.checkpoint):
-    parser.error("--allow_auxiliary_change requires --checkpoint and cannot be used with --resume")
+if (args.allow_auxiliary_change or args.allow_control_change) and (args.resume or not args.checkpoint):
+    parser.error("Control-change options require --checkpoint and cannot be used with --resume")
 app = AppLauncher(args).app
 
 import gymnasium as gym
@@ -71,7 +75,8 @@ def main():
         runner_type = NoiseFloorRunner if floor > 0 else OnPolicyRunner
         runner = runner_type(env, agent_dict, log_dir=str(log), device=args.device)
         if args.checkpoint:
-            validate_checkpoint(args.checkpoint, schema, allow_auxiliary_change=args.allow_auxiliary_change)
+            validate_checkpoint(args.checkpoint, schema, allow_auxiliary_change=args.allow_auxiliary_change,
+                                allow_control_change=args.allow_control_change)
             runner.load(str(args.checkpoint), load_optimizer=args.resume, map_location=args.device)
             if args.resume:
                 runner.current_learning_iteration += 1
@@ -86,5 +91,9 @@ def main():
 
 try:
     main()
+except BaseException:
+    traceback.print_exc()
+    sys.stderr.flush()
+    raise
 finally:
     app.close()

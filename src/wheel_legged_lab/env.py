@@ -100,11 +100,13 @@ class WheelLeggedEnv(DirectRLEnv):
         state = self._finish_step()
         tilt_limit = math.cos(math.radians(self.cfg.settings.termination_tilt_deg))
         cfg = self.cfg.settings.termination
-        immediate = (~state.finite
+        immediate = (~state.finite | state.forbidden_contact
             | (self.robot.data.joint_vel[:, self.binding.action_ids].abs().amax(dim=1) > cfg.joint_speed_limit)
             | (state.linear_velocity.abs().amax(dim=1) > cfg.root_linear_speed_limit)
             | (state.angular_velocity.abs().amax(dim=1) > cfg.root_angular_speed_limit))
-        ordinary = state.forbidden_contact | (-state.gravity[:, 2] < tilt_limit)
+        # Never let intermittent base/gimbal ground contact evade a consecutive
+        # counter. Persistence is only for tilt, not forbidden-body collisions.
+        ordinary = -state.gravity[:, 2] < tilt_limit
         terminate = self.termination.update(ordinary, immediate, self.common_step_counter).clone()
         timeout = self.episode_length_buf >= self.max_episode_length - 1
         return terminate, timeout

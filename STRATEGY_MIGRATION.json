@@ -1,0 +1,109 @@
+{
+  "scope": "Ordinary PPO control and training mechanisms; selected explicitly by user",
+  "date": "2026-11-12",
+  "sources": {
+    "source/agent_tasks/agent_tasks/direct/wheelbipe/wheelbipe25_v3/env.py": "99ce083c4b41e021a110dcf0131da7d268fc22cc516edd164b530b534d71cdf8",
+    "source/agent_world/agent_world/actuators/diff_vel_actuator.py": "841bd56dc7af170b07d2fd0fbe032a0b298fec489ee7a55a31dcaa32931e999e",
+    "source/agent_world/agent_world/actuators/m3508_actuator.py": "59ae730d1a1a98836302e33c19804e40189e11c52fdb6069cf469156510f0ae7",
+    "source/agent_rl/agent_rl/rsl_rl/runners/on_policy_runner_noise_floor.py": "48aeb526770862bdd9ccc7cea13d328ff02b141652035ceb7c2263e5c9ccaa22"
+  },
+  "ported": [
+    "action EMA",
+    "independent leg/wheel physical-step latency",
+    "finite-difference velocity with wrapping/reset/EMA",
+    "measured torque-speed interpolation and CSV output-shaft conversion",
+    "actor history and delay",
+    "sustained contact/tilt termination with immediate numerical termination",
+    "scalar/log exploration noise floor",
+    "second action difference reward",
+    "positive wheel-power reward",
+    "optional root velocity randomization"
+  ],
+  "kept": [
+    "v2 joint map and reset pose",
+    "posture penalties",
+    "pitch auxiliary hold",
+    "command sampler",
+    "jump state machine",
+    "PPO MLP hidden widths"
+  ],
+  "not_ported": [
+    "HIM/DreamWaQ (outside selected scope)",
+    "old geometry-specific leg IK reset",
+    "old full reward table and curriculum",
+    "rough-terrain/gimbal spin-translation branches",
+    "legacy trained weights"
+  ],
+  "missing_measured_curve": "experiments/v14_flat/005_3508_motor/m3508_c620_current_closed_loop_raw_motor_shaft_curve_dense.csv",
+  "missing_curve_exists": false,
+  "cpu_tests_passed": 19,
+  "training_smoke": {
+    "num_envs": 16,
+    "iterations": 5,
+    "actor_history": 3,
+    "actor_dim": 105,
+    "critic_dim": 60,
+    "checkpoint": "outputs/legacy_ppo_validation/stand/2026-11-12_09-57-24/model_4.pt",
+    "final_scalars": {
+      "Train/mean_reward": -8.954922676086426,
+      "Policy/mean_noise_std": 0.24992138147354126,
+      "Loss/value_function": 6.447848320007324,
+      "Loss/surrogate": 1.0862388080568053e-05
+    },
+    "note": "Random initialization; validates execution/backpropagation, not standing performance."
+  },
+  "baseline_regression": {
+    "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/posture_validation/stand/2026-11-11_20-20-00/model_199.pt",
+    "num_envs": 4,
+    "requested_steps": 500,
+    "steady_samples": 1604,
+    "resets": 0,
+    "metrics": {
+      "roll_deg": {
+        "mean": -0.33734115958213806,
+        "rms": 0.5901097059249878,
+        "min": -2.1758651733398438,
+        "max": 0.125813826918602
+      },
+      "pitch_deg": {
+        "mean": -1.1503620147705078,
+        "rms": 1.1990630626678467,
+        "min": -2.1946511268615723,
+        "max": -0.7226149439811707
+      },
+      "yaw_axis_tilt_deg": {
+        "mean": 1.2469066381454468,
+        "rms": 1.3363686800003052,
+        "min": 0.7230757474899292,
+        "max": 2.911074638366699
+      },
+      "hip_left_minus_right_z_m": {
+        "mean": -0.0018332063918933272,
+        "rms": 0.0032065699342638254,
+        "min": -0.011820465326309204,
+        "max": 0.0006838738918304443
+      },
+      "gimbal_pitch_rad": {
+        "mean": -0.025820434093475342,
+        "rms": 0.025822224095463753,
+        "min": -0.026623239740729332,
+        "max": -0.024617116898298264
+      },
+      "left_contact": {
+        "mean": 1.0,
+        "rms": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "right_contact": {
+        "mean": 1.0,
+        "rms": 1.0,
+        "min": 1.0,
+        "max": 1.0
+      }
+    }
+  },
+  "csv_conversion_cli_smoke": "pass (temporary synthetic two-point CSV; no measured data fabricated)",
+  "training_noise_floor_initialization": "clamped again after checkpoint fine-tuning resets exploration std",
+  "validation_status": "19 CPU tests, static checks, 16-env 5-update PPO smoke, and baseline checkpoint 4-env 500-step regression passed"
+}

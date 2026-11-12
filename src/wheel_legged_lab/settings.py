@@ -189,6 +189,7 @@ def settings_for(task: str, robot_file: str | None = None, strategy: str = "base
     if strategy == "legacy_ppo":
         s.motors.action_filter_alpha = 0.8
         s.motors.velocity_feedback = "finite_difference"
+        s.motors.velocity_filter_alpha = 0.2
         s.termination.duration_steps = 20
         s.motors.delay_steps = (1, 3)
         s.motors.delay_clock = "physics"
