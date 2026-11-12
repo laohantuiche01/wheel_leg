@@ -18,7 +18,7 @@ class MotorSettings:
 
 @dataclass
 class TerminationSettings:
-    duration_steps: int = 1
+    duration_steps: int = 1  # tilt only; forbidden-body contacts always terminate immediately
     joint_speed_limit: float = 500.0
     root_linear_speed_limit: float = 100.0
     root_angular_speed_limit: float = 200.0

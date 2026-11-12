@@ -102,6 +102,33 @@ class PostureControlTest(unittest.TestCase):
         result = reward.compute(state, commands, motors, jump, torch.zeros(3, dtype=torch.bool), .02)
         torch.testing.assert_close(result, torch.zeros(3))
 
+    def test_clearance_and_non_wheel_contact_do_not_reward_single_wheel_balance(self):
+        _, state, commands, motors, jump = self.make_reward_inputs()
+        reward = RewardModel(types.SimpleNamespace(weights=dict(standing_wheel_clearance=-80., non_wheel_contact=-2.)), 3, 'cpu')
+        state.wheel_clearance = torch.tensor([[.1, 0.], [0., .1], [.1, .1]])
+        state.non_wheel_contact = torch.tensor([False, True, True])
+        jump.phase[2] = jump.FLIGHT
+        result = reward.compute(state, commands, motors, jump, torch.zeros(3, dtype=torch.bool), .02)
+        torch.testing.assert_close(result, torch.tensor([-.8, -2.8, -2.]) * .02)
+
+    def test_control_change_exception_keeps_action_and_history_checks(self):
+        spec = RobotDescription.load(ROOT / 'src/wheel_legged_lab/assets/v2_0.json')
+        old = observation_schema(spec)
+        old['observation_settings'] = dict(actor_history=1, actor_delay=0)
+        new = deepcopy(old)
+        new['observation_settings']['actor_delay'] = 1
+        new['motor_settings'] = dict(velocity_feedback='finite_difference')
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / 'model.pt'
+            save_schema(directory, old)
+            with self.assertRaises(ValueError):
+                validate_checkpoint(checkpoint, new)
+            with self.assertWarns(UserWarning):
+                validate_checkpoint(checkpoint, new, allow_control_change=True)
+            new['actor_dim'] = 105
+            with self.assertRaises(ValueError):
+                validate_checkpoint(checkpoint, new, allow_control_change=True)
+
     def test_auxiliary_change_exception_still_rejects_layout_changes(self):
         spec = RobotDescription.load(ROOT / "src/wheel_legged_lab/assets/v2_0.json")
         old = observation_schema(spec)
