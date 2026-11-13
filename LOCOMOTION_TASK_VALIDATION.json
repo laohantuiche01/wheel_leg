@@ -1,0 +1,408 @@
+{
+  "date": "2026-11-12T11:59:39",
+  "scope": "walk and in-place spinning chassis with fixed world gimbal yaw",
+  "execution_status": "pass",
+  "policy_convergence": "not established; bounded integration checks only",
+  "cpu_tests": {
+    "count": 35,
+    "status": "pass",
+    "command": "python -m unittest discover -s tests -v"
+  },
+  "static_checks": "pass",
+  "training_runs": {
+    "walk": {
+      "directory": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/walk/2026-11-12_11-48-22",
+      "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/walk/2026-11-12_11-48-22/model_7.pt",
+      "checkpoint_sha256": "5e6cfea282bb78464e732374093c1d990f5440afd2a1fcae0f878574266eb39d",
+      "launch": {
+        "task": "walk",
+        "num_envs": 16,
+        "max_iterations": 8,
+        "seed": 42,
+        "robot_spec": null,
+        "strategy": "legacy_ppo",
+        "actor_history": 1,
+        "noise_std_floor": null,
+        "motor_curves": null,
+        "checkpoint": "outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt",
+        "resume": false,
+        "transfer_actor": true,
+        "allow_auxiliary_change": false,
+        "allow_control_change": false,
+        "mass_randomization": false,
+        "pushes": false,
+        "log_root": "outputs/locomotion_task_validation",
+        "enable_cameras": false,
+        "xr": false,
+        "device": "cuda:0",
+        "cpu": false,
+        "verbose": false,
+        "info": false,
+        "rendering_mode": null,
+        "kit_args": "",
+        "anim_recording_enabled": false,
+        "anim_recording_start_time": 0,
+        "anim_recording_stop_time": 10,
+        "headless": true,
+        "hide_ui": true,
+        "create_new_stage": false,
+        "physics_gpu": 0,
+        "active_gpu": 0
+      },
+      "updates_completed": 8,
+      "total_environment_steps": 3072,
+      "model_state_finite": true,
+      "actor_dim": 35,
+      "critic_dim": 60,
+      "actor_transfer": {
+        "source": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt",
+        "source_sha256": "fb141450c7af9cffd1966bd1de533fb70a7de8f3b3a8e0fc62c5296a13152f1e",
+        "source_actor_dim": 35,
+        "destination_actor_dim": 35,
+        "history": 1,
+        "zeroed_new_columns": 0,
+        "critic": "fresh initialization",
+        "optimizer": "fresh initialization"
+      }
+    },
+    "spin": {
+      "directory": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/spin/2026-11-12_11-49-15",
+      "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/spin/2026-11-12_11-49-15/model_7.pt",
+      "checkpoint_sha256": "71521b11dd3cee41eee13fb79ccc004ef798efb6e7b88f85d8afcbd2156a1534",
+      "launch": {
+        "task": "spin",
+        "num_envs": 16,
+        "max_iterations": 8,
+        "seed": 42,
+        "robot_spec": null,
+        "strategy": "legacy_ppo",
+        "actor_history": 1,
+        "noise_std_floor": null,
+        "motor_curves": null,
+        "checkpoint": "outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt",
+        "resume": false,
+        "transfer_actor": true,
+        "allow_auxiliary_change": false,
+        "allow_control_change": false,
+        "mass_randomization": false,
+        "pushes": false,
+        "log_root": "outputs/locomotion_task_validation",
+        "enable_cameras": false,
+        "xr": false,
+        "device": "cuda:0",
+        "cpu": false,
+        "verbose": false,
+        "info": false,
+        "rendering_mode": null,
+        "kit_args": "",
+        "anim_recording_enabled": false,
+        "anim_recording_start_time": 0,
+        "anim_recording_stop_time": 10,
+        "headless": true,
+        "hide_ui": true,
+        "create_new_stage": false,
+        "physics_gpu": 0,
+        "active_gpu": 0
+      },
+      "updates_completed": 8,
+      "total_environment_steps": 3072,
+      "model_state_finite": true,
+      "actor_dim": 40,
+      "critic_dim": 65,
+      "actor_transfer": {
+        "source": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt",
+        "source_sha256": "fb141450c7af9cffd1966bd1de533fb70a7de8f3b3a8e0fc62c5296a13152f1e",
+        "source_actor_dim": 35,
+        "destination_actor_dim": 40,
+        "history": 1,
+        "zeroed_new_columns": 5,
+        "critic": "fresh initialization",
+        "optimizer": "fresh initialization"
+      }
+    }
+  },
+  "evaluations": {
+    "walk": {
+      "task": "walk",
+      "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/walk/2026-11-12_11-48-22/model_7.pt",
+      "strategy": "legacy_ppo",
+      "seed": 42,
+      "num_envs": 2,
+      "requested_steps": 250,
+      "completed_steps": 250,
+      "resets": 1,
+      "steady_samples": 284,
+      "manual_command": {
+        "vx": 0.5,
+        "wz": 0.0
+      },
+      "metrics": {
+        "episode_age_s": {
+          "mean": 3.4157042503356934,
+          "rms": 3.5150108337402344,
+          "min": 2.0,
+          "max": 5.0
+        },
+        "command_vx": {
+          "mean": 0.5,
+          "rms": 0.5,
+          "min": 0.5,
+          "max": 0.5
+        },
+        "command_wz": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "axle_vx": {
+          "mean": -0.6131036281585693,
+          "rms": 0.7641109824180603,
+          "min": -1.7942456007003784,
+          "max": 1.3256704807281494
+        },
+        "axle_vy": {
+          "mean": -0.009656324051320553,
+          "rms": 0.05571432039141655,
+          "min": -0.6665472984313965,
+          "max": 0.07271432131528854
+        },
+        "world_yaw_rate": {
+          "mean": 0.027923639863729477,
+          "rms": 0.10667266696691513,
+          "min": -0.9307039976119995,
+          "max": 0.3549974262714386
+        },
+        "vx_error": {
+          "mean": 1.1131036281585693,
+          "rms": 1.2029004096984863,
+          "min": -0.8256704807281494,
+          "max": 2.294245719909668
+        },
+        "yaw_rate_error": {
+          "mean": -0.027923639863729477,
+          "rms": 0.10667266696691513,
+          "min": -0.3549974262714386,
+          "max": 0.9307039976119995
+        },
+        "height_m": {
+          "mean": 0.4057702124118805,
+          "rms": 0.40664368867874146,
+          "min": 0.3786452114582062,
+          "max": 0.4867108464241028
+        },
+        "roll_deg": {
+          "mean": 2.332202434539795,
+          "rms": 14.240238189697266,
+          "min": -1.432098150253296,
+          "max": 178.6212158203125
+        },
+        "pitch_deg": {
+          "mean": -23.28052520751953,
+          "rms": 26.66321563720703,
+          "min": -86.51715850830078,
+          "max": -11.575648307800293
+        },
+        "both_wheels_contact": {
+          "mean": 0.9718309640884399,
+          "rms": 0.9858148694038391,
+          "min": 0.0,
+          "max": 1.0
+        },
+        "non_wheel_contact": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "gimbal_heading_error_deg": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "gimbal_world_yaw_rate": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "gimbal_relative_yaw_rate": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "axle_displacement_m": {
+          "mean": 0.7477732300758362,
+          "rms": 0.9503791928291321,
+          "min": 0.0296777430921793,
+          "max": 2.16680908203125
+        }
+      },
+      "note": "Execution and tracking measurements; no convergence or robustness guarantee is inferred.",
+      "training_started": false,
+      "trajectory_rows": 500,
+      "nonfinite_trajectory_rows": 0,
+      "summary_path": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/walk_evaluation/summary.json",
+      "trajectory_path": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/walk_evaluation/trajectory.csv"
+    },
+    "spin": {
+      "task": "spin",
+      "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/spin/2026-11-12_11-49-15/model_7.pt",
+      "strategy": "legacy_ppo",
+      "seed": 42,
+      "num_envs": 2,
+      "requested_steps": 250,
+      "completed_steps": 250,
+      "resets": 2,
+      "steady_samples": 207,
+      "manual_command": {
+        "vx": 0.0,
+        "wz": 2.0
+      },
+      "metrics": {
+        "episode_age_s": {
+          "mean": 3.025024175643921,
+          "rms": 3.083482027053833,
+          "min": 2.0,
+          "max": 4.059999942779541
+        },
+        "command_vx": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "command_wz": {
+          "mean": 1.9521738290786743,
+          "rms": 1.9560316801071167,
+          "min": 1.469999074935913,
+          "max": 2.0
+        },
+        "axle_vx": {
+          "mean": 1.0985257625579834,
+          "rms": 1.2462903261184692,
+          "min": 0.3794253468513489,
+          "max": 2.6604771614074707
+        },
+        "axle_vy": {
+          "mean": 0.002439932432025671,
+          "rms": 0.013380042277276516,
+          "min": -0.06260287761688232,
+          "max": 0.03979849815368652
+        },
+        "world_yaw_rate": {
+          "mean": 0.06716015189886093,
+          "rms": 0.15582916140556335,
+          "min": -0.02343093417584896,
+          "max": 0.4894537329673767
+        },
+        "vx_error": {
+          "mean": -1.0985257625579834,
+          "rms": 1.2462903261184692,
+          "min": -2.6604771614074707,
+          "max": -0.3794253468513489
+        },
+        "yaw_rate_error": {
+          "mean": 1.885013461112976,
+          "rms": 1.8921778202056885,
+          "min": 1.4913915395736694,
+          "max": 2.0024936199188232
+        },
+        "height_m": {
+          "mean": 0.3236996829509735,
+          "rms": 0.32461220026016235,
+          "min": 0.22611138224601746,
+          "max": 0.33950257301330566
+        },
+        "roll_deg": {
+          "mean": -0.26059845089912415,
+          "rms": 0.6306246519088745,
+          "min": -1.7001447677612305,
+          "max": 1.4521697759628296
+        },
+        "pitch_deg": {
+          "mean": 28.10969352722168,
+          "rms": 31.177486419677734,
+          "min": 9.881406784057617,
+          "max": 66.09060668945312
+        },
+        "both_wheels_contact": {
+          "mean": 1.0,
+          "rms": 1.0,
+          "min": 1.0,
+          "max": 1.0
+        },
+        "non_wheel_contact": {
+          "mean": 0.0,
+          "rms": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        },
+        "gimbal_heading_error_deg": {
+          "mean": -0.586443305015564,
+          "rms": 0.6891781091690063,
+          "min": -0.868062436580658,
+          "max": 0.8480499386787415
+        },
+        "gimbal_world_yaw_rate": {
+          "mean": -0.032540928572416306,
+          "rms": 0.09217697381973267,
+          "min": -0.0779208168387413,
+          "max": 0.302519291639328
+        },
+        "gimbal_relative_yaw_rate": {
+          "mean": -0.1310531198978424,
+          "rms": 0.1776086688041687,
+          "min": -0.4901100993156433,
+          "max": -0.03730065003037453
+        },
+        "axle_displacement_m": {
+          "mean": 0.9053621888160706,
+          "rms": 1.0692895650863647,
+          "min": 0.20047208666801453,
+          "max": 2.229522705078125
+        }
+      },
+      "note": "Execution and tracking measurements; no convergence or robustness guarantee is inferred.",
+      "training_started": false,
+      "trajectory_rows": 500,
+      "nonfinite_trajectory_rows": 0,
+      "summary_path": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/spin_evaluation/summary.json",
+      "trajectory_path": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/spin_evaluation/trajectory.csv"
+    }
+  },
+  "playback_regressions": [
+    {
+      "task": "stand",
+      "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt",
+      "num_envs": 1,
+      "steps": 50,
+      "automatic_metadata": true,
+      "headless": true,
+      "exit_code": 0
+    },
+    {
+      "task": "spin",
+      "checkpoint": "/home/rm-nuaa/wheel_leg/IasscLab/outputs/locomotion_task_validation/spin/2026-11-12_11-49-15/model_7.pt",
+      "num_envs": 1,
+      "steps": 50,
+      "automatic_metadata": true,
+      "headless": true,
+      "exit_code": 0
+    }
+  ],
+  "preserved_components": {
+    "src/wheel_legged_lab/components/commands.py": "806264daf686757966dec6cfad21176c1884e9ababc27adfc8736a2270e1b0f3",
+    "src/wheel_legged_lab/components/jump.py": "d71d82ded1eebd5b6e3a8ec2945cea34123255b316be241b2c580b7550716964",
+    "src/wheel_legged_lab/ppo.py": "f0177573ce738e497279a30eeb9e1573aac303b208b896c2df4af07a2b479e0f"
+  },
+  "limitations": [
+    "Eight PPO updates per task are insufficient for convergence; these checkpoints are integration artifacts.",
+    "Walk and spin velocity tracking errors and episode resets remain in the short-run evaluation.",
+    "Gimbal stabilization holds world yaw; pitch remains joint-zero hold.",
+    "Flat ground and in-place spin only; no world-frame spinning translation or terrain curriculum.",
+    "No long-duration, disturbance or full-speed robustness claim."
+  ]
+}

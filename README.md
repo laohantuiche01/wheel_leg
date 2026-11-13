@@ -4,18 +4,20 @@
 主环境只继承一次 `DirectRLEnv`，任务差异使用配置工厂，控制和扰动使用对象组合。
 源码不导入旧 `agent_tasks`、`agent_world`、V13、V14，也不修改正在运行的旧训练。
 
-**当前状态：已完成 v2 模型适配、USD 离线检查和 27 项 CPU 测试；已加入姿态/站姿修正及可选的旧普通 PPO 控制/训练机制。**
+**当前状态：已完成 v2 模型适配、姿态修正、普通 PPO 机制和纯平移/原地小陀螺任务，38 项 CPU 测试通过。**
 原问题的实测指标见 [站姿诊断](docs/STAND_DIAGNOSIS.md)，修改内容与训练方式见 [姿态修正](docs/POSTURE_CONTROL.md)。
 新迁移机制、配置和训练命令见 [普通 PPO 迁移说明](docs/LEGACY_PPO_MIGRATION.md)。默认 `baseline` 保留已验证行为；用 `--strategy legacy_ppo` 启用新适配配置。
 回放会自动读取权重对应的策略/历史配置；退出原因和两腿前后错位的修正见 [回放与站姿修正](docs/PLAYBACK_STANCE_FIX.md)。
-请在运行仿真前按 [后续验证清单](docs/VALIDATION.md) 检查模型闭链、接触和电机方向。这里不承诺已可训练。
+当前 `walk` 只训练前后平移（±2 m/s、wz=0），`spin` 只训练原地旋转（±2 rad/s、平移为零，云台保持世界 yaw）。
+参数、Actor 迁移和命令见 [行走与小陀螺](docs/LOCOMOTION_TASKS.md)。
+两任务已完成短时 PPO/回放验证，尚未训练到稳定跟踪；完整物理与扰动验证仍按 [后续验证清单](docs/VALIDATION.md) 进行。
 
 ## 代码结构
 
 ```text
 src/wheel_legged_lab/
   env.py                    唯一环境类：只编排 DirectRLEnv 生命周期
-  config.py                 唯一环境配置类 + stand/height/velocity/jump 工厂
+  config.py                 唯一环境配置类 + 六种任务配置工厂
   settings.py               分组参数，不依赖仿真器
   robot.py                  机器人描述、Isaac 资产构建、关节和接触索引绑定
   assets/v2_0.json           默认机器人关节角色、静息位姿、电机参数
@@ -26,6 +28,7 @@ src/wheel_legged_lab/
     motors.py               MotorBank / SpringController / AuxiliaryHoldController
     disturbances.py         MassRandomizer / ForceDisturbance
     commands.py             CommandSampler：站立、直行、转弯、原地旋转
+    locomotion.py           新任务命令渐变、独立云台世界 yaw 控制
     jump.py                 JumpController：起跳、腾空、接触恢复、成功/超时
     state.py                StateReader：一次测量，供奖励和终止共享
     observations.py         ObservationBuilder：带版本的 Actor/Critic 观测契约
@@ -34,8 +37,9 @@ src/wheel_legged_lab/
   ppo.py                    独立 PPO 配置
   checkpoints.py            保存/检查观测与机器人契约
 scripts/
-  train.py                  后续训练入口，本次未执行
-  play.py                   后续固定指令回放入口，本次未执行
+  train.py                  训练、恢复与显式 Actor 迁移
+  play.py                   自动恢复配置、固定指令回放
+  evaluate_locomotion.py    行走/小陀螺指标与轨迹导出
   static_check.py           仅 AST/JSON/TOML/文件校验，不导入工程或仿真器
   migrate_v2_model.py       从原始 USDZ 重建 v2 资产、配置和来源报告
   check_model.py            离线检查 USD 闭链、关节轴、零位和根坐标
@@ -87,7 +91,8 @@ Isaac 的策略电机执行器设为零 PD，仅接受力矩前馈，避免双�
 v2 腿/轮沿用旧控制器增益和限幅：腿 60/2、160 Nm；轮 0/0.2、5 Nm。左右关节方向在配置中显式映射到策略坐标，电机延迟按控制步计算。
 弹簧拥有独立控制器，不能再由其他组件重复写同一关节。
 弹簧 `offset=None` 时取各自的模型复位位置，v2 为 0 m，v1 仍为 -0.0482 m；预载、刚度及阻尼沿用。
-云台 pitch 使用独立位置保持（关节相对零位，Kp=120、Kd=3、限幅 8 N·m），不占用策略动作；yaw 仍为被动阻尼。
+云台 pitch 使用独立位置保持（关节相对零位，Kp=120、Kd=3、限幅 8 N·m），不占用策略动作。
+yaw 在 `spin` 中使用独立世界朝向 PD（20/1.5、限幅 2 N·m），其他任务仍为被动阻尼。
 着地阶段增加 roll²、pitch² 和 roll/pitch 角速度平方惩罚，权重分别为 -20、-10、-0.2。
 
 ## 更换完整体模型
@@ -102,7 +107,7 @@ v2 腿/轮沿用旧控制器增益和限幅：腿 60/2、160 Nm；轮 0/0.2、5 
 
 当前测量和跳跃组件明确要求两轮、平地；下一步若增加复杂地形，先替换地面高度测量组件。
 
-## 训练入口（原训练完成且验证通过后再运行）
+## 训练入口
 
 沿用原有 Python/Isaac Lab 环境，不安装或升级依赖：
 
@@ -112,16 +117,21 @@ cd /home/rm-nuaa/wheel_leg/IasscLab
   --task stand --num_envs 1024 --max_iterations 3000 --headless
 ```
 
-`--task` 可取 `stand`、`height`、`velocity`、`jump`。
+`--task` 可取 `stand`、`height`、`velocity`、`jump`、`walk`、`spin`。
 `--mass_randomization` 和 `--pushes` 分别开启启动质量随机化、随机力扰动。
 同一新工程的 checkpoint 微调使用 `--checkpoint`，恢复优化器和迭代号另加 `--resume`。
+保守微调加 `--finetune`：小学习率、3 次更新、每 50 轮保存并保留源权重动作噪声；
+操作示例见 [任务说明](docs/LOCOMOTION_TASKS.md)。
+已执行的两轮行走微调、候选权重及性能取舍见 [微调实测](docs/WALK_FINETUNE.md)。
 **不要直接传旧项目 checkpoint**：虽然 Actor 仍为 35 维、Critic 为 60 维，v2 的动作关节和方向已变化，checkpoint 契约会拒绝旧权重。
-本次迁移没有转换网络权重。入口默认使用 v2；显式回退旧模型可加
+`walk` / `spin` 可通过 `--checkpoint ... --transfer_actor` 迁移本工程匹配的 v2 Actor；
+`spin` 逐帧扩展输入并重新初始化 Critic，命令见 [任务说明](docs/LOCOMOTION_TASKS.md)。
+入口默认使用 v2；显式回退旧模型可加
 `--robot_spec /home/rm-nuaa/wheel_leg/IasscLab/src/wheel_legged_lab/assets/v1_0.json`。
 已有 v2 权重在观测/动作/资产完全匹配、仅辅助控制改变时，可用 `--checkpoint ... --allow_auxiliary_change`
 显式微调；不能同时加 `--resume`。修正后的新权重按默认严格契约正常回放。
 
-注册任务是 `WheelLegged-{Stand,Height,Velocity,Jump}-Direct-v0`。
+注册任务是 `WheelLegged-{Stand,Height,Velocity,Jump,Walk,Spin}-Direct-v0`。
 包可直接由脚本引入，无需修改旧工程的 PYTHONPATH 或 editable 安装。
 
 回放时通过 `scripts/play.py --checkpoint <权重路径> --task stand` 打开可视化窗口（不加 `--headless`）。
