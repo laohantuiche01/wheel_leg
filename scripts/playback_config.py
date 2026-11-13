@@ -24,8 +24,11 @@ def resolve_playback_args(args):
         setattr(args, field, saved)
     if args.strategy not in ("baseline", "legacy_ppo") or not isinstance(args.actor_history, int) or args.actor_history < 1:
         raise ValueError("Invalid saved playback strategy/history")
-    args.task = args.task or launch.get("task", "stand")
-    if args.task not in ("stand", "height", "velocity", "jump"):
+    saved_task = launch.get("task", schema.get("motion_task", {}).get("task", "stand"))
+    if schema.get("motion_task") and args.task is not None and args.task != saved_task:
+        raise ValueError(f"Checkpoint task is {saved_task}; use the matching task or omit --task")
+    args.task = args.task or saved_task
+    if args.task not in ("stand", "height", "velocity", "jump", "walk", "spin"):
         raise ValueError("Invalid saved task")
     args.seed = args.seed if args.seed is not None else launch.get("seed", 42)
     if args.robot_spec is None:
@@ -44,5 +47,15 @@ def restore_runtime_settings(settings, schema):
             if isinstance(getattr(target, name), tuple):
                 value = tuple(value)
             setattr(target, name, value)
+    motion = schema.get("motion_task", {})
+    for group in ("commands", "spin"):
+        target = getattr(settings, group)
+        for name, value in motion.get(group, {}).items():
+            if not hasattr(target, name):
+                raise ValueError(f"Unsupported saved motion setting: {group}.{name}")
+            setattr(target, name, tuple(value) if isinstance(getattr(target, name), tuple) else value)
+    for key in ("velocity_reference", "support_all_ground", "lean_in_turns"):
+        if key in motion:
+            setattr(settings.rewards, key, motion[key])
     settings.observations.noise_enabled = False
     settings.validate()

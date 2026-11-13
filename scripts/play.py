@@ -9,7 +9,7 @@ from isaaclab.app import AppLauncher
 from playback_config import resolve_playback_args, restore_runtime_settings
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--task", choices=("stand", "height", "velocity", "jump"), default=None)
+parser.add_argument("--task", choices=("stand", "height", "velocity", "jump", "walk", "spin"), default=None)
 parser.add_argument("--checkpoint", type=Path, required=True)
 parser.add_argument("--allow_auxiliary_change", action="store_true",
                     help="Explicitly evaluate matching v2 weights with changed auxiliary joint control")
@@ -20,8 +20,9 @@ parser.add_argument("--strategy", choices=("baseline", "legacy_ppo"), default=No
 parser.add_argument("--actor_history", type=int, default=None)
 parser.add_argument("--seed", type=int, default=None)
 parser.add_argument("--motor_curves", type=Path)
-parser.add_argument("--vx", type=float, default=0.0)
-parser.add_argument("--wz", type=float, default=0.0)
+parser.add_argument("--vx", type=float, default=None)
+parser.add_argument("--wz", type=float, default=None)
+parser.add_argument("--gimbal_heading", type=float, help="Absolute world heading in radians; spin only")
 parser.add_argument("--command_height", type=float, help="Robot target height in meters (not the render/window height)")
 parser.add_argument("--jump_at", type=float, default=2.0, help="Seconds until one jump request")
 AppLauncher.add_app_launcher_args(parser)
@@ -64,7 +65,11 @@ def main():
         print(f"[INFO] Policy loaded. Replaying {args.steps} steps.", flush=True)
         with torch.inference_mode():
             obs, _ = env.reset()
-            u.set_play_velocity_command(vx=args.vx, vy=0.0, wz=args.wz)
+            vx = args.vx if args.vx is not None else (0.5 if args.task == "walk" else 0.0)
+            wz = args.wz if args.wz is not None else (2.0 if args.task == "spin" else 0.0)
+            u.set_play_velocity_command(vx=vx, vy=0.0, wz=wz)
+            if args.gimbal_heading is not None:
+                u.set_gimbal_heading(args.gimbal_heading)
             if args.command_height is not None:
                 u.set_height_command(args.command_height)
             obs = env.get_observations()
