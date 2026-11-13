@@ -60,7 +60,7 @@ class RobotDescription:
         if not Path(spec.usd).is_file():
             raise FileNotFoundError(spec.usd)
         group_names = [g.name for g in spec.motors]
-        if (len(group_names) != len(set(group_names)) or set(group_names) & {"passive", "springs", "auxiliary"}
+        if (len(group_names) != len(set(group_names)) or set(group_names) & {"passive", "springs", "auxiliary", "gimbal_heading"}
                 or any(name.startswith("auxiliary_hold_") for name in group_names)):
             raise ValueError("Motor group names must be unique and not reserved")
         for group in spec.motors:
@@ -105,7 +105,7 @@ class RobotDescription:
         if len(reset_names) != len(set(reset_names)) or set(reset_names) != set(names):
             raise ValueError("Rest pose must cover every articulation joint exactly once")
 
-    def build_articulation(self):
+    def build_articulation(self, spin=None):
         import isaaclab.sim as sim
         from isaaclab.assets import ArticulationCfg
         from isaaclab.actuators import IdealPDActuatorCfg
@@ -123,7 +123,14 @@ class RobotDescription:
         if self.spring_joints:
             actuators["springs"] = IdealPDActuatorCfg(joint_names_expr=self.spring_joints,
                 stiffness=0.0, damping=0.0, effort_limit=1000.0, velocity_limit=50.0, armature=0.0001)
-        damped = [name for name in self.auxiliary_joints if name not in self.auxiliary_holds]
+        heading_joint = spin.yaw_joint if spin is not None and spin.enabled else None
+        if heading_joint is not None:
+            if heading_joint not in self.auxiliary_joints or heading_joint in self.auxiliary_holds:
+                raise ValueError("Gimbal heading control must have exclusive auxiliary joint ownership")
+            actuators["gimbal_heading"] = IdealPDActuatorCfg(joint_names_expr=[heading_joint],
+                stiffness=0.0, damping=0.0, effort_limit=spin.effort_limit, effort_limit_sim=spin.effort_limit,
+                velocity_limit=spin.speed_limit, velocity_limit_sim=spin.speed_limit, armature=0.0001)
+        damped = [name for name in self.auxiliary_joints if name not in self.auxiliary_holds and name != heading_joint]
         if damped:
             actuators["auxiliary"] = IdealPDActuatorCfg(joint_names_expr=damped,
                 stiffness=0.0, damping=0.5, effort_limit=2.0, velocity_limit=30.0, armature=0.0001)

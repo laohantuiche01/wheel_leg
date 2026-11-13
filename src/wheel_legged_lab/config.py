@@ -27,8 +27,8 @@ class WheelLeggedEnvCfg(DirectRLEnvCfg):
     def __post_init__(self):
         self.settings.validate()
         spec = RobotDescription.load(self.settings.robot_file)
-        self.robot_cfg = spec.build_articulation()
-        schema = observation_schema(spec, self.settings.observations)
+        self.robot_cfg = spec.build_articulation(self.settings.spin)
+        schema = observation_schema(spec, self.settings.observations, self.settings.spin)
         self.action_space = len(spec.action_names)
         self.observation_space = schema["actor_dim"]
         self.state_space = schema["critic_dim"]
@@ -44,3 +44,9 @@ def velocity_env_cfg():
 
 def jump_env_cfg():
     return WheelLeggedEnvCfg(settings=settings_for("jump"))
+
+def walk_env_cfg():
+    return WheelLeggedEnvCfg(settings=settings_for("walk"))
+
+def spin_env_cfg():
+    return WheelLeggedEnvCfg(settings=settings_for("spin"))

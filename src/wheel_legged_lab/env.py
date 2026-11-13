@@ -19,6 +19,7 @@ from .components.reset import ResetController
 from .components.rewards import RewardModel
 from .components.state import StateReader
 from .components.legacy_control import SustainedTermination
+from .components.locomotion import LocomotionCommands, GimbalHeadingController
 
 class WheelLeggedEnv(DirectRLEnv):
     cfg: WheelLeggedEnvCfg
@@ -34,15 +35,18 @@ class WheelLeggedEnv(DirectRLEnv):
         self.termination = SustainedTermination(s.termination, n, device)
         self.springs = SpringController(self.robot, self.binding, s.spring, n, device)
         self.auxiliary_holds = AuxiliaryHoldController(self.robot, self.binding, self.description, n, device)
+        self.gimbal_heading = (GimbalHeadingController(self.robot, self.description, s.spin, n, device)
+                               if s.spin.enabled else None)
         self.mass = MassRandomizer(self.robot, s.mass, n, device)
         self.force = ForceDisturbance(self.robot, s.force, n, device)
-        self.commands = CommandSampler(s.commands, n, device)
+        command_type = LocomotionCommands if s.task in ("walk", "spin") else CommandSampler
+        self.commands = command_type(s.commands, n, device)
         self.jump = JumpController(s.jump, n, device)
         self.reader = StateReader(self.robot, self.contact_sensor, self.binding, self.description,
-                                  self.scene.env_origins, s.contact_force_threshold)
+                                  self.scene.env_origins, s.contact_force_threshold, self.gimbal_heading)
         self.observations = ObservationBuilder(s.observations, self.robot, self.motors,
-                                               self.commands, self.jump, self.mass, self.force)
-        self.rewards = RewardModel(s.rewards, n, device)
+                                               self.commands, self.jump, self.mass, self.force, self.gimbal_heading)
+        self.rewards = RewardModel(s.rewards, n, device, heading_sigma=s.spin.heading_sigma)
         self.reset_controller = ResetController(self.robot, self.scene.env_origins, s)
         self._all_ids = torch.arange(n, device=device)
         self._state_tick = self._reward_tick = -1
@@ -52,7 +56,9 @@ class WheelLeggedEnv(DirectRLEnv):
         self.springs.reset(self._all_ids)
         self.force.reset(self._all_ids)
         self.commands.reset(self._all_ids)
-        self.observation_schema = observation_schema(self.description, s.observations)
+        if self.gimbal_heading is not None:
+            self.gimbal_heading.reset(self._all_ids)
+        self.observation_schema = observation_schema(self.description, s.observations, s.spin)
         self.observation_schema.update(
             asset_sha256=hashlib.sha256(Path(self.description.usd).read_bytes()).hexdigest(),
             observation_settings=asdict(s.observations),
@@ -65,6 +71,10 @@ class WheelLeggedEnv(DirectRLEnv):
         from .settings import MotorSettings
         if asdict(s.motors) != asdict(MotorSettings()):
             self.observation_schema["motor_settings"] = asdict(s.motors)
+        if s.task in ("walk", "spin"):
+            self.observation_schema["motion_task"] = dict(task=s.task, commands=asdict(s.commands),
+                spin=asdict(s.spin), velocity_reference=s.rewards.velocity_reference,
+                support_all_ground=s.rewards.support_all_ground, lean_in_turns=s.rewards.lean_in_turns)
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -86,6 +96,8 @@ class WheelLeggedEnv(DirectRLEnv):
         self.motors.apply()
         self.springs.apply()
         self.auxiliary_holds.apply()
+        if self.gimbal_heading is not None:
+            self.gimbal_heading.apply()
         self.force.apply()
 
     def _finish_step(self):
@@ -141,6 +153,8 @@ class WheelLeggedEnv(DirectRLEnv):
         self.motors.reset(env_ids)
         self.springs.reset(env_ids)
         self.auxiliary_holds.reset(env_ids)
+        if self.gimbal_heading is not None:
+            self.gimbal_heading.reset(env_ids)
         self.termination.reset(env_ids)
         self.observations.reset(env_ids)
         self.commands.reset(env_ids)
@@ -157,7 +171,15 @@ class WheelLeggedEnv(DirectRLEnv):
     def set_play_velocity_command(self, vx=None, vy=None, wz=None, env_ids=None):
         if self.cfg.settings.jump.enabled and any(value not in (None, 0, 0.0) for value in (vx, vy, wz)):
             raise ValueError("The initial jump task only supports in-place jumps")
+        if self.cfg.settings.task == "spin" and (vx not in (None, 0, 0.0) or vy not in (None, 0, 0.0)):
+            raise ValueError("Spin is in-place: translational commands must be zero")
         self.commands.set_manual(self._ids(env_ids), vx=vx, vy=vy, wz=wz)
+
+    @torch.inference_mode()
+    def set_gimbal_heading(self, heading, env_ids=None):
+        if self.gimbal_heading is None:
+            raise RuntimeError("World-frame gimbal heading control is only enabled for spin")
+        self.gimbal_heading.set_target(self._ids(env_ids), heading)
 
     @torch.inference_mode()
     def set_height_command(self, height, env_ids=None):

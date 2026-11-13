@@ -3,16 +3,23 @@ import torch
 from .state import body_tilt_angles
 
 class RewardModel:
-    def __init__(self, cfg, n, device):
+    def __init__(self, cfg, n, device, heading_sigma=0.2):
         self.weights = dict(cfg.weights)
+        self.cfg, self.heading_sigma = cfg, heading_sigma
         self.sums = {name: torch.zeros(n, device=device) for name in self.weights}
         self.metric_sums = {name: torch.zeros(n, device=device) for name in
-            ("RollRMSDeg", "PitchRMSDeg", "TiltRMSDeg", "WheelHeightDiffRMSM", "WheelStaggerRMSM", "BothWheelsContactFraction")}
+            ("RollRMSDeg", "PitchRMSDeg", "TiltRMSDeg", "WheelHeightDiffRMSM", "WheelStaggerRMSM", "BothWheelsContactFraction",
+             "VelocityErrorRMS", "YawRateErrorRMS", "LateralSpeedRMS", "GimbalHeadingRMSDeg", "GimbalWorldYawRateRMS")}
         self.metric_time = torch.zeros(n, device=device)
 
     def compute(self, state, commands, motors, jump, terminated, dt):
-        vx_error = commands.velocity[:, 0] - state.linear_velocity[:, 0]
-        yaw_error = commands.velocity[:, 2] - state.angular_velocity[:, 2]
+        linear_velocity, yaw_rate = state.linear_velocity, state.angular_velocity[:, 2]
+        if getattr(self.cfg, "velocity_reference", "base_body") == "axle_heading":
+            if state.axle_linear_velocity_heading is None or state.yaw_rate_world is None:
+                raise ValueError("Axle velocity and world yaw rate are required for locomotion rewards")
+            linear_velocity, yaw_rate = state.axle_linear_velocity_heading, state.yaw_rate_world
+        vx_error = commands.velocity[:, 0] - linear_velocity[:, 0]
+        yaw_error = commands.velocity[:, 2] - yaw_rate
         height_error = commands.height - state.height
         ground_phase = ((jump.phase == jump.IDLE) | (jump.phase == jump.LAND)).float()
         reference_height, reference_velocity = jump.push_reference()
@@ -22,6 +29,13 @@ class RewardModel:
         stagger = getattr(state, "wheel_fore_aft_difference", None)
         stagger = torch.zeros_like(state.height) if stagger is None else stagger
         standing = ground_phase * (commands.velocity.abs().amax(dim=1) < 0.1).float()
+        support = ground_phase if getattr(self.cfg, "support_all_ground", False) else standing
+        reference_roll = (-(commands.velocity[:, 0] * commands.velocity[:, 2] / 9.81).atan().clamp(-.2, .2)
+                          if getattr(self.cfg, "lean_in_turns", False) else 0.0)
+        heading_error = getattr(state, "gimbal_heading_error", None)
+        heading_error = torch.zeros_like(state.height) if heading_error is None else heading_error
+        heading_rate = getattr(state, "gimbal_world_yaw_rate", None)
+        heading_rate = torch.zeros_like(state.height) if heading_rate is None else heading_rate
         non_wheel = getattr(state, "non_wheel_contact", None)
         non_wheel = torch.zeros_like(state.height) if non_wheel is None else non_wheel.float()
         second_diff = motors.actions - 2 * motors.previous + getattr(motors, "before_previous", motors.previous)
@@ -31,17 +45,22 @@ class RewardModel:
         else:
             wheel_power = torch.zeros_like(state.height)
         terms = {
-            "velocity": torch.exp(-vx_error.square()), "velocity_error": vx_error.square(),
+            "velocity": torch.exp(-(vx_error / getattr(self.cfg, "velocity_sigma", 1.0)).square()),
+            "velocity_error": vx_error.square(),
             "yaw": torch.exp(-yaw_error.square() / .5), "yaw_error": yaw_error.square(),
             "height": ground_phase * torch.exp(-height_error.square() / .01),
             "height_error": ground_phase * height_error.square(), "upright": upright.square(),
-            "roll_error": ground_phase * roll.square(),
+            "roll_error": ground_phase * (roll - reference_roll).square(),
             "pitch_error": ground_phase * pitch.square(),
             "roll_pitch_rate": ground_phase * state.angular_velocity[:, :2].square().sum(dim=1),
-            "wheel_stagger": standing * stagger.square(),
-            "double_support": standing * state.wheel_contact.all(dim=1).float(),
-            "standing_wheel_clearance": standing * state.wheel_clearance.clamp(min=0).square().sum(dim=1),
+            "wheel_stagger": support * stagger.square(),
+            "double_support": support * state.wheel_contact.all(dim=1).float(),
+            "standing_wheel_clearance": support * state.wheel_clearance.clamp(min=0).square().sum(dim=1),
             "non_wheel_contact": non_wheel,
+            "lateral_velocity": linear_velocity[:, 1].square(),
+            "spin_drift": linear_velocity[:, :2].square().sum(dim=1),
+            "gimbal_heading": torch.exp(-(heading_error / self.heading_sigma).square()),
+            "gimbal_heading_error": heading_error.square(),
             "vertical_velocity": ground_phase * state.vertical_velocity.square(),
             "torque": motors.effort.square().sum(dim=1),
             "action_rate": (motors.actions - motors.previous).square().sum(dim=1),
@@ -69,6 +88,9 @@ class RewardModel:
             TiltRMSDeg=torch.acos((-state.gravity[:, 2]).clamp(-1, 1)).rad2deg().square(),
             WheelHeightDiffRMSM=(state.wheel_clearance[:, 0] - state.wheel_clearance[:, 1]).square(),
             WheelStaggerRMSM=stagger.square(),
+            VelocityErrorRMS=vx_error.square(), YawRateErrorRMS=yaw_error.square(),
+            LateralSpeedRMS=linear_velocity[:, 1].square(), GimbalHeadingRMSDeg=heading_error.rad2deg().square(),
+            GimbalWorldYawRateRMS=heading_rate.square(),
             BothWheelsContactFraction=state.wheel_contact.all(dim=1).float())
         for name, value in metrics.items():
             self.metric_sums[name] += torch.where(state.finite, torch.nan_to_num(value), 0.0) * dt

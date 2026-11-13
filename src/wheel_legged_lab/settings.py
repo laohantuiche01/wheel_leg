@@ -1,8 +1,10 @@
 """Typed, simulator-independent settings. All units are SI / output-shaft units."""
 from dataclasses import dataclass, field
 from pathlib import Path
+import math
 
 ASSET_DIR = Path(__file__).resolve().parent / "assets"
+TASKS = ("stand", "height", "velocity", "jump", "walk", "spin")
 
 @dataclass
 class MotorSettings:
@@ -59,6 +61,21 @@ class CommandSettings:
     straight_fraction: float = 0.25  # fractions of NON-standing commands
     spin_fraction: float = 0.25
     spin_min_speed: float = 0.5
+    settle_s: float = 1.0
+    linear_accel: float = 0.8
+    yaw_accel: float = 1.5
+
+@dataclass
+class SpinSettings:
+    enabled: bool = False
+    yaw_joint: str = "gimbal_yaw_joint"
+    yaw_body: str = "gimbal_yaw_link"
+    kp: float = 20.0
+    kd: float = 1.5
+    effort_limit: float = 2.0
+    speed_limit: float = 30.0
+    velocity_observation_scale: float = 0.1
+    heading_sigma: float = 0.2  # radians
 
 @dataclass
 class JumpSettings:
@@ -96,6 +113,10 @@ class ObservationSettings:
 
 @dataclass
 class RewardSettings:
+    velocity_sigma: float = 1.0  # m/s; original exp(-error**2) at the default
+    velocity_reference: str = "base_body"
+    support_all_ground: bool = False
+    lean_in_turns: bool = False
     weights: dict[str, float] = field(default_factory=lambda: {
         "velocity": 2.0, "velocity_error": -0.25,
         "yaw": 1.5, "yaw_error": -0.25,
@@ -104,6 +125,8 @@ class RewardSettings:
         "roll_error": -20.0, "pitch_error": -10.0, "roll_pitch_rate": -0.2,
         "wheel_stagger": -50.0, "double_support": 2.0,
         "standing_wheel_clearance": -80.0, "non_wheel_contact": -2.0,
+        "lateral_velocity": 0.0, "spin_drift": 0.0,
+        "gimbal_heading": 0.0, "gimbal_heading_error": 0.0,
         "torque": -0.0001, "action_rate": -0.01,
         "action_smoothness": 0.0, "wheel_power": 0.0,
         "termination": -10.0,
@@ -121,6 +144,7 @@ class TaskSettings:
     spring: SpringSettings = field(default_factory=SpringSettings)
     commands: CommandSettings = field(default_factory=CommandSettings)
     jump: JumpSettings = field(default_factory=JumpSettings)
+    spin: SpinSettings = field(default_factory=SpinSettings)
     observations: ObservationSettings = field(default_factory=ObservationSettings)
     rewards: RewardSettings = field(default_factory=RewardSettings)
     termination: TerminationSettings = field(default_factory=TerminationSettings)
@@ -131,6 +155,20 @@ class TaskSettings:
     contact_force_threshold: float = 5.0
 
     def validate(self):
+        if not math.isfinite(self.rewards.velocity_sigma) or self.rewards.velocity_sigma <= 0:
+            raise ValueError("Velocity reward sigma must be finite and positive")
+        if self.task not in TASKS:
+            raise ValueError(f"Unknown task: {self.task}")
+        if self.rewards.velocity_reference not in ("base_body", "axle_heading"):
+            raise ValueError("Unknown velocity reference")
+        if self.commands.settle_s < 0 or min(self.commands.linear_accel, self.commands.yaw_accel) <= 0:
+            raise ValueError("Invalid locomotion command ramp")
+        if self.spin.enabled and (self.task != "spin" or self.jump.enabled):
+            raise ValueError("World-heading control is reserved for the spin task")
+        if self.task == "spin" and (not self.spin.enabled or self.commands.vx != (0.0, 0.0)):
+            raise ValueError("Spin requires heading control and zero translational command")
+        if min(self.spin.kp, self.spin.effort_limit, self.spin.speed_limit, self.spin.heading_sigma) <= 0 or self.spin.kd < 0:
+            raise ValueError("Invalid gimbal heading controller")
         if not 0 < self.motors.action_filter_alpha <= 1 or not 0 < self.motors.velocity_filter_alpha <= 1:
             raise ValueError("Filter coefficients must lie in (0, 1]")
         if self.motors.velocity_feedback not in ("simulator", "finite_difference"):
@@ -176,9 +214,9 @@ def settings_for(task: str, robot_file: str | None = None, strategy: str = "base
     if robot_file is not None:
         s.robot_file = str(Path(robot_file).resolve())
     spec = RobotDescription.load(s.robot_file)
-    if task not in ("stand", "height", "velocity", "jump"):
+    if task not in TASKS:
         raise ValueError(f"Unknown task: {task}")
-    if task != "velocity":
+    if task not in ("velocity", "walk", "spin"):
         s.commands.vx = (0.0, 0.0)
         s.commands.wz = (0.0, 0.0)
         s.commands.standing_fraction = 1.0
@@ -188,6 +226,27 @@ def settings_for(task: str, robot_file: str | None = None, strategy: str = "base
     if task == "jump":
         s.commands.height = (0.28, 0.28)
         s.jump.enabled = True
+    if task in ("walk", "spin"):
+        s.commands.height = (0.35, 0.35)
+        s.rewards.velocity_reference = "axle_heading"
+        s.rewards.support_all_ground = True
+        s.rewards.weights.update(lateral_velocity=-1.0, wheel_stagger=-20.0,
+                                 standing_wheel_clearance=-80.0, action_smoothness=-0.001)
+    if task == "walk":
+        s.commands.vx, s.commands.wz = (-2.0, 2.0), (0.0, 0.0)
+        s.commands.interval_s = (4.0, 8.0)
+        s.commands.standing_fraction = 0.1
+        s.commands.straight_fraction, s.commands.spin_fraction = 1.0, 0.0
+        s.rewards.lean_in_turns = False
+        s.rewards.weights.update(velocity=3.0, velocity_error=-1.0)
+    if task == "spin":
+        s.spin.enabled = True
+        s.commands.vx, s.commands.wz = (0.0, 0.0), (-2.0, 2.0)
+        s.commands.interval_s = (30.0, 40.0)  # keep the selected direction within a 20s episode
+        s.commands.standing_fraction = s.commands.straight_fraction = 0.0
+        s.commands.spin_fraction, s.commands.spin_min_speed = 1.0, 1.0
+        s.rewards.weights.update(yaw=3.0, yaw_error=-1.0, spin_drift=-3.0,
+                                 gimbal_heading=1.0, gimbal_heading_error=-1.0)
     if strategy == "legacy_ppo":
         s.motors.action_filter_alpha = 0.8
         s.motors.velocity_feedback = "finite_difference"
