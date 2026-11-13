@@ -70,6 +70,23 @@ class PlaybackAndStanceTest(unittest.TestCase):
         self.assertEqual(target.observations.actor_history, 3)
         self.assertFalse(target.observations.noise_enabled)
 
+    def test_legacy_mixed_walk_and_spin_ranges_restore_for_playback(self):
+        saved = settings_for('walk')
+        saved.commands.wz = (-2., 2.)
+        saved.commands.straight_fraction = .6
+        saved.rewards.lean_in_turns = True
+        target = settings_for('walk')
+        self.assertEqual(target.commands.wz, (0., 0.))
+        restore_runtime_settings(target, dict(motion_task=dict(commands=asdict(saved.commands),
+            spin=asdict(saved.spin), lean_in_turns=True)))
+        self.assertEqual(target.commands.wz, (-2., 2.))
+        self.assertTrue(target.rewards.lean_in_turns)
+        spin = settings_for('spin')
+        saved.commands = settings_for('spin').commands
+        saved.commands.wz = (-3., 3.)
+        restore_runtime_settings(spin, dict(motion_task=dict(commands=asdict(saved.commands))))
+        self.assertEqual(spin.commands.wz, (-3., 3.))
+
     def test_fore_aft_offset_uses_body_frame_and_not_world_x(self):
         quats = torch.tensor([[1., 0., 0., 0.], [math.sqrt(.5), 0., 0., math.sqrt(.5)]])
         wheels = torch.tensor([[[.1, .2, 0.], [0., -.2, 0.]], [[-.4, .1, 0.], [0., 0., 0.]]])
