@@ -266,6 +266,19 @@ class KeyboardPlaybackTest(unittest.TestCase):
             self.assertEqual(feedback[0]['blocked'],['height'])
             self.assertEqual(feedback[-1]['failures'],1)
 
+    def test_clear_and_focus_loss_cancel_environment_queued_jump(self):
+        adapter,callback,window,_,_=self.adapter('jump')
+        cancelled=[]
+        adapter.env.cancel_jump_request=lambda:cancelled.append(True)
+        callback(types.SimpleNamespace(input='L',type=1))
+        self.assertEqual(cancelled,[])  # callback edits CPU state only
+        adapter.advance(.02)
+        self.assertEqual(len(cancelled),1)
+        window.focused=False
+        adapter.advance(.02)
+        self.assertEqual(len(cancelled),2)
+        adapter.close()
+
 
 if __name__ == '__main__':
     unittest.main()

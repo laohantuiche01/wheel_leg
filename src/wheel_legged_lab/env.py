@@ -45,6 +45,7 @@ class WheelLeggedEnv(DirectRLEnv):
         jump_type = MeasuredJumpController if s.jump.enabled and s.jump.implementation in ("measured_v1", "measured_v2") else JumpController
         self.jump = jump_type(s.jump, n, device)
         self.record_jump_transitions = False
+        self.keyboard_control = None
         self.reader = StateReader(self.robot, self.contact_sensor, self.binding, self.description,
                                   self.scene.env_origins, s.contact_force_threshold, self.gimbal_heading)
         self.observations = ObservationBuilder(s.observations, self.robot, self.motors,
@@ -179,8 +180,19 @@ class WheelLeggedEnv(DirectRLEnv):
     def _ids(self, env_ids):
         return self._all_ids if env_ids is None else torch.as_tensor(env_ids, dtype=torch.long, device=self.device).flatten()
 
+    def enable_keyboard_control(self, height_range=(.20, .38)):
+        """Explicit playback override; call after validating/loading weights."""
+        if self.keyboard_control is None:
+            from .components.keyboard_mode import UnifiedKeyboardControl
+            self.keyboard_control = UnifiedKeyboardControl(self, height_range)
+        elif self.keyboard_control.height_range != tuple(height_range):
+            raise ValueError("Keyboard control is already configured with another height range")
+        return self.keyboard_control
+
     @torch.inference_mode()
     def set_play_velocity_command(self, vx=None, vy=None, wz=None, env_ids=None):
+        if self.keyboard_control is not None:
+            return self.keyboard_control.set_velocity(self._ids(env_ids), vx=vx, vy=vy, wz=wz)
         if self.cfg.settings.jump.enabled and any(value not in (None, 0, 0.0) for value in (vx, vy, wz)):
             raise ValueError("The initial jump task only supports in-place jumps")
         if self.cfg.settings.task == "spin" and (vx not in (None, 0, 0.0) or vy not in (None, 0, 0.0)):
@@ -195,13 +207,22 @@ class WheelLeggedEnv(DirectRLEnv):
 
     @torch.inference_mode()
     def set_height_command(self, height, env_ids=None):
+        if self.keyboard_control is not None:
+            return self.keyboard_control.set_height(self._ids(env_ids), height)
         if self.cfg.settings.jump.enabled and height >= self.cfg.settings.jump.release_height:
             raise ValueError("Jump standing height must be below release height")
         self.commands.set_manual(self._ids(env_ids), height=height)
 
     @torch.inference_mode()
     def request_jump_takeoff(self, env_ids=None):
+        if self.keyboard_control is not None:
+            return self.keyboard_control.request_jump(self._ids(env_ids))
         self.jump.request(self._ids(env_ids))
+
+    @torch.inference_mode()
+    def cancel_jump_request(self, env_ids=None):
+        """Clear queued requests; an already active jump continues normally."""
+        self.jump.requested[self._ids(env_ids)] = False
 
     @torch.inference_mode()
     def apply_external_force(self, force_xyz, duration_s, torque_xyz=(0., 0., 0.), env_ids=None):

@@ -91,7 +91,8 @@ $PY /home/rm-nuaa/wheel_leg/IasscLab/scripts/play.py \
   --checkpoint "$JUMP" --keyboard --num_envs 1 --steps 0
 ```
 
-键盘 Q 请求一次跳跃。回放关闭自动跳跃，准备/冷却条件满足后才执行；W/S/A/D 在原地跳跃中禁用。
+键盘 Q 请求一次跳跃。回放关闭自动跳跃，准备/冷却条件满足后才执行。
+`--keyboard`已统一开放W/S/A/D和Z/X，独立跳跃训练仍使用零速度指令；未训练的平移/旋转跟随能力需另行训练。
 不用键盘时可通过 `--jump_at 3` 在回放3秒时请求一次跳跃。
 
 评估默认每轮准备2.5 s、请求一次、再观测3 s，输出 `summary.json` 与可选 `trace.jsonl`。

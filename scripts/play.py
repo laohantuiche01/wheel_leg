@@ -30,9 +30,11 @@ parser.add_argument("--gimbal_heading", type=float, help="Absolute world heading
 parser.add_argument("--command_height", type=float, help="Robot target height in meters (not the render/window height)")
 parser.add_argument("--jump_at", type=float, default=2.0, help="Seconds until one jump request")
 parser.add_argument("--keyboard", action="store_true", help="GUI keyboard playback: W/S, A/D, Z/X, L, Q")
-parser.add_argument("--keyboard_speed", type=float, default=2.0, help="Held W/S speed in m/s, bounded by trained range")
-parser.add_argument("--keyboard_turn_rate", type=float, default=2.0, help="Held A/D yaw rate in rad/s, bounded by trained range")
+parser.add_argument("--keyboard_speed", type=float, default=2.0, help="Held W/S speed in m/s")
+parser.add_argument("--keyboard_turn_rate", type=float, default=2.0, help="Held A/D yaw rate in rad/s")
 parser.add_argument("--keyboard_height_rate", type=float, default=0.2, help="Held Z/X height change in m/s")
+parser.add_argument("--keyboard_min_height", type=float, default=0.20, help="Keyboard minimum target height in meters")
+parser.add_argument("--keyboard_max_height", type=float, default=0.38, help="Keyboard maximum target height in meters")
 parser.add_argument("--keyboard_pulse_hold", type=float, default=0.2, help="Hold short/character input pulses for seconds; 0 disables compatibility")
 parser.add_argument("--keyboard_log", type=Path, help="Input/command JSONL log; defaults to outputs/playback/keyboard_TIMESTAMP.jsonl")
 parser.add_argument("--no_camera_follow", action="store_true", help="Keep manual camera control in keyboard mode")
@@ -50,6 +52,11 @@ try:
         raise ValueError("Keyboard rates must be finite and positive")
     if not math.isfinite(args.keyboard_pulse_hold) or args.keyboard_pulse_hold < 0:
         raise ValueError("keyboard_pulse_hold must be finite and nonnegative")
+    if (not all(math.isfinite(v) for v in (args.keyboard_min_height, args.keyboard_max_height))
+            or not 0 < args.keyboard_min_height < args.keyboard_max_height):
+        raise ValueError("Keyboard height bounds must be finite, positive and increasing")
+    if args.keyboard and args.command_height is not None and not args.keyboard_min_height <= args.command_height <= args.keyboard_max_height:
+        raise ValueError("command_height must lie inside the keyboard height bounds")
 except (ValueError, OSError) as exc:
     parser.error(str(exc))
 print(f"[INFO] Playback: task={args.task}, strategy={args.strategy}, actor_history={args.actor_history}, seed={args.seed}", flush=True)
@@ -87,6 +94,8 @@ def main():
         runner = OnPolicyRunner(env, WheelLeggedPPORunnerCfg().to_dict(), log_dir=None, device=args.device)
         runner.load(str(args.checkpoint), load_optimizer=False, map_location=args.device)
         policy = runner.get_inference_policy(device=args.device)
+        if args.keyboard:
+            u.enable_keyboard_control((args.keyboard_min_height, args.keyboard_max_height))
         print(f"[INFO] Policy loaded. Replaying {'until window closes' if args.steps == 0 else str(args.steps) + ' steps'}.", flush=True)
         with torch.inference_mode():
             obs, _ = env.reset()
@@ -103,7 +112,8 @@ def main():
                 from wheel_legged_lab.components.keyboard import KeyboardCommandState, PlaybackKeyboard
                 state = KeyboardCommandState(settings, float(u.commands.height[0]),
                     speed=args.keyboard_speed, turn_rate=args.keyboard_turn_rate, height_rate=args.keyboard_height_rate,
-                    fixed_vx=args.vx, fixed_wz=args.wz, fixed_height=args.command_height, pulse_hold=args.keyboard_pulse_hold)
+                    fixed_vx=args.vx, fixed_wz=args.wz, fixed_height=args.command_height, pulse_hold=args.keyboard_pulse_hold,
+                    unified=True, height_range=(args.keyboard_min_height, args.keyboard_max_height))
                 log_path = args.keyboard_log or (Path(__file__).resolve().parents[1] / "outputs/playback" /
                     f"keyboard_{datetime.now():%Y-%m-%d_%H-%M-%S_%f}.jsonl")
                 keyboard = PlaybackKeyboard(u, state, log_path=log_path)
