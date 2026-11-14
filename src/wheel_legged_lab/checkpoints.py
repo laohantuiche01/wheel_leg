@@ -5,7 +5,7 @@ import warnings
 
 
 def transfer_locomotion_actor(policy, path, schema, *, device="cpu"):
-    """Seed walk/spin from a compatible v2 actor; keep critic/optimizer fresh.
+    """Seed walk/spin/jump from a compatible v2 actor; keep critic/optimizer fresh.
 
     Spin appends five fields to EACH history frame. Copy the old frame blocks
     into their matching positions, zeroing the new columns so the initial mean
@@ -19,8 +19,8 @@ def transfer_locomotion_actor(policy, path, schema, *, device="cpu"):
     path = Path(path)
     actual = json.loads((path.parent / "observation_schema.json").read_text())
     expected = json.loads(json.dumps(schema))
-    if expected.get("motion_task", {}).get("task") not in ("walk", "spin"):
-        raise ValueError("Actor transfer is only available for walk/spin destinations")
+    if expected.get("motion_task", {}).get("task") not in ("walk", "spin") and not expected.get("jump_task"):
+        raise ValueError("Actor transfer is only available for walk/spin/measured-jump destinations")
     required = ("version", "robot", "asset_sha256", "action_names", "action_directions", "motor_modes",
                 "action_scales", "motor_groups", "rest_joint_positions", "rest_height", "wheel_radius", "spring_settings")
     for key in required:

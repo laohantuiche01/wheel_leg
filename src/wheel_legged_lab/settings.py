@@ -80,6 +80,7 @@ class SpinSettings:
 @dataclass
 class JumpSettings:
     enabled: bool = False
+    implementation: str = "legacy"
     automatic: bool = True
     rate_per_s: float = 0.5
     min_episode_s: float = 2.0
@@ -97,6 +98,9 @@ class JumpSettings:
     vertical_speed_tolerance: float = 0.3
     tilt_cos_min: float = 0.94
     angular_speed_tolerance: float = 1.5
+    release_speed_fraction: float = 0.6
+    release_force_max: float = 20.0
+    push_timeout_s: float = 0.28
 
 @dataclass
 class ObservationSettings:
@@ -132,6 +136,7 @@ class RewardSettings:
         "termination": -10.0,
         "jump_push_velocity": 4.0, "jump_push_height": 2.0,
         "jump_airtime": 3.0, "jump_peak": 50.0, "jump_success": 100.0,
+        "jump_takeoff": 0.0, "jump_failed": 0.0,
     })
 
 @dataclass
@@ -207,6 +212,21 @@ class TaskSettings:
             raise ValueError("Require standing height < release height < peak height")
         if self.jump.timeout_s <= self.jump.max_push_s + self.jump.stable_landing_s:
             raise ValueError("Jump timeout must leave time for landing")
+        j = self.jump
+        if j.implementation not in ("legacy", "measured_v1"):
+            raise ValueError("Unknown jump implementation")
+        jump_values = (j.rate_per_s, j.min_episode_s, j.cooldown_s, *j.peak_height, j.release_height,
+            j.max_push_s, j.timeout_s, j.min_air_s, j.air_clearance, j.min_upward_speed,
+            j.stable_landing_s, j.height_tolerance, j.horizontal_speed_tolerance,
+            j.vertical_speed_tolerance, j.angular_speed_tolerance, j.release_speed_fraction,
+            j.release_force_max, j.push_timeout_s, j.tilt_cos_min)
+        if not all(math.isfinite(v) for v in jump_values) or min(jump_values) < 0:
+            raise ValueError("Jump parameters must be finite and nonnegative")
+        if (min(j.max_push_s, j.min_air_s, j.min_upward_speed, j.stable_landing_s,
+                j.height_tolerance, j.vertical_speed_tolerance, j.angular_speed_tolerance) <= 0
+                or not 0 < j.release_speed_fraction <= 1 or not 0 < j.tilt_cos_min <= 1
+                or not 0 < j.push_timeout_s < j.timeout_s):
+            raise ValueError("Invalid jump timing or release/landing gates")
 
 def settings_for(task: str, robot_file: str | None = None, strategy: str = "baseline") -> TaskSettings:
     from .robot import RobotDescription
@@ -226,6 +246,9 @@ def settings_for(task: str, robot_file: str | None = None, strategy: str = "base
     if task == "jump":
         s.commands.height = (0.28, 0.28)
         s.jump.enabled = True
+        s.jump.implementation = "measured_v1"
+        s.rewards.weights.update(jump_push_velocity=1.0, jump_push_height=0.25,
+                                 jump_takeoff=100.0, jump_success=200.0, jump_failed=-25.0)
     if task in ("walk", "spin"):
         s.commands.height = (0.35, 0.35)
         s.rewards.velocity_reference = "axle_heading"

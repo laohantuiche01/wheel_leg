@@ -35,6 +35,7 @@ class RobotState:
     yaw_rate_world: torch.Tensor | None = None
     gimbal_heading_error: torch.Tensor | None = None
     gimbal_world_yaw_rate: torch.Tensor | None = None
+    wheel_contact_force: torch.Tensor | None = None
 
 class StateReader:
     def __init__(self, robot, sensor, binding, spec, origins, threshold, heading=None):
@@ -70,4 +71,5 @@ class StateReader:
             axle_linear_velocity_heading=world_to_heading(axle_velocity, d.root_quat_w),
             axle_position_world=d.body_pos_w[:, b.wheel_body_ids].mean(dim=1),
             yaw_rate_world=d.root_ang_vel_w[:, 2],
-            gimbal_heading_error=heading_error, gimbal_world_yaw_rate=heading_rate)
+            gimbal_heading_error=heading_error, gimbal_world_yaw_rate=heading_rate,
+            wheel_contact_force=force[:, b.wheel_sensor_ids])

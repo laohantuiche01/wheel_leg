@@ -24,6 +24,9 @@ class RewardModel:
         ground_phase = ((jump.phase == jump.IDLE) | (jump.phase == jump.LAND)).float()
         reference_height, reference_velocity = jump.push_reference()
         push = (jump.phase == jump.PUSH).float()
+        measured_jump = getattr(jump, "measured", False)
+        positive_scale = 1.0 - 0.5 * (1.0 - ground_phase) if measured_jump else 1.0
+        posture_mask = 1.0 if measured_jump else ground_phase
         upright = (-state.gravity[:, 2]).clamp(0., 1.)
         roll, pitch = body_tilt_angles(state.gravity)
         stagger = getattr(state, "wheel_fore_aft_difference", None)
@@ -45,14 +48,14 @@ class RewardModel:
         else:
             wheel_power = torch.zeros_like(state.height)
         terms = {
-            "velocity": torch.exp(-(vx_error / getattr(self.cfg, "velocity_sigma", 1.0)).square()),
+            "velocity": positive_scale * torch.exp(-(vx_error / getattr(self.cfg, "velocity_sigma", 1.0)).square()),
             "velocity_error": vx_error.square(),
-            "yaw": torch.exp(-yaw_error.square() / .5), "yaw_error": yaw_error.square(),
+            "yaw": positive_scale * torch.exp(-yaw_error.square() / .5), "yaw_error": yaw_error.square(),
             "height": ground_phase * torch.exp(-height_error.square() / .01),
-            "height_error": ground_phase * height_error.square(), "upright": upright.square(),
-            "roll_error": ground_phase * (roll - reference_roll).square(),
-            "pitch_error": ground_phase * pitch.square(),
-            "roll_pitch_rate": ground_phase * state.angular_velocity[:, :2].square().sum(dim=1),
+            "height_error": ground_phase * height_error.square(), "upright": positive_scale * upright.square(),
+            "roll_error": posture_mask * (roll - reference_roll).square(),
+            "pitch_error": posture_mask * pitch.square(),
+            "roll_pitch_rate": posture_mask * state.angular_velocity[:, :2].square().sum(dim=1),
             "wheel_stagger": support * stagger.square(),
             "double_support": support * state.wheel_contact.all(dim=1).float(),
             "standing_wheel_clearance": support * state.wheel_clearance.clamp(min=0).square().sum(dim=1),
@@ -66,11 +69,14 @@ class RewardModel:
             "action_rate": (motors.actions - motors.previous).square().sum(dim=1),
             "action_smoothness": second_diff.square().sum(dim=1), "wheel_power": wheel_power,
             "termination": terminated.float(),
-            "jump_push_velocity": push * torch.exp(-(state.vertical_velocity - reference_velocity).square() / .5),
+            "jump_push_velocity": (jump.push_progress_reward if measured_jump else
+                                   push * torch.exp(-(state.vertical_velocity - reference_velocity).square() / .5)),
             "jump_push_height": push * torch.exp(-(state.height - reference_height).square() / .003),
             "jump_airtime": (jump.air_now & jump.seen_air).float(),
             "jump_peak": (jump.exit_event & jump.seen_air).float() * torch.exp(-(jump.peak - jump.target_peak).square() / .003),
             "jump_success": jump.success_event.float(),
+            "jump_takeoff": jump.takeoff_event.float() if measured_jump else torch.zeros_like(state.height),
+            "jump_failed": jump.failure_event.float() if measured_jump else torch.zeros_like(state.height),
         }
         missing = set(self.weights) - set(terms)
         if missing:

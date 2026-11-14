@@ -24,8 +24,8 @@ def resolve_playback_args(args):
         setattr(args, field, saved)
     if args.strategy not in ("baseline", "legacy_ppo") or not isinstance(args.actor_history, int) or args.actor_history < 1:
         raise ValueError("Invalid saved playback strategy/history")
-    saved_task = launch.get("task", schema.get("motion_task", {}).get("task", "stand"))
-    if schema.get("motion_task") and args.task is not None and args.task != saved_task:
+    saved_task = "jump" if schema.get("jump_task") else launch.get("task", schema.get("motion_task", {}).get("task", "stand"))
+    if (schema.get("motion_task") or schema.get("jump_task")) and args.task is not None and args.task != saved_task:
         raise ValueError(f"Checkpoint task is {saved_task}; use the matching task or omit --task")
     args.task = args.task or saved_task
     if args.task not in ("stand", "height", "velocity", "jump", "walk", "spin"):
@@ -57,5 +57,25 @@ def restore_runtime_settings(settings, schema):
     for key in ("velocity_reference", "support_all_ground", "lean_in_turns"):
         if key in motion:
             setattr(settings.rewards, key, motion[key])
+    if settings.task == "jump":
+        restore_jump_settings(settings, schema)
     settings.observations.noise_enabled = False
     settings.validate()
+
+
+def restore_jump_settings(settings, schema):
+    saved = schema.get("jump_task")
+    if saved is None:
+        # Historical v2 jump checkpoints used the original timer-based helper.
+        settings.jump.implementation = "legacy"
+        settings.rewards.weights.update(jump_push_velocity=4., jump_push_height=2.,
+            jump_success=100., jump_takeoff=0., jump_failed=0.)
+        return
+    if saved.get("version") != "measured-jump-v1":
+        raise ValueError("Unsupported jump checkpoint version")
+    for group in ("commands", "jump"):
+        target = getattr(settings, group)
+        for name, value in saved[group].items():
+            if not hasattr(target, name):
+                raise ValueError(f"Unsupported saved jump setting: {group}.{name}")
+            setattr(target, name, tuple(value) if isinstance(getattr(target, name), tuple) else value)

@@ -26,7 +26,7 @@ parser.add_argument("--finetune", action="store_true",
 parser.add_argument("--velocity_sigma", type=float, default=None,
                     help="Positive velocity reward tolerance in m/s; explicit walk fine-tuning only")
 parser.add_argument("--transfer_actor", action="store_true",
-                    help="Initialize a walk/spin actor from a matching base policy; initialize critic and optimizer fresh")
+                    help="Initialize a walk/spin/jump actor from a matching base policy; initialize critic and optimizer fresh")
 parser.add_argument("--allow_auxiliary_change", action="store_true",
                     help="Explicitly fine-tune matching v2 weights after changing auxiliary joint control")
 parser.add_argument("--allow_control_change", action="store_true",
@@ -45,8 +45,17 @@ if args.finetune and (not args.checkpoint or args.resume or args.transfer_actor
 if (args.allow_auxiliary_change or args.allow_control_change) and (args.resume or not args.checkpoint):
     parser.error("Control-change options require --checkpoint and cannot be used with --resume")
 if args.transfer_actor and (not args.checkpoint or args.resume or args.allow_control_change or args.allow_auxiliary_change
-                            or args.task not in ("walk", "spin")):
-    parser.error("--transfer_actor requires --checkpoint and walk/spin, and cannot combine with resume/control-change options")
+                            or args.task not in ("walk", "spin", "jump")):
+    parser.error("--transfer_actor requires --checkpoint and walk/spin/jump, and cannot combine with resume/control-change options")
+if args.task == "jump" and args.checkpoint and not args.transfer_actor:
+    try:
+        saved = json.loads((args.checkpoint.parent / "observation_schema.json").read_text())
+        launch_path = args.checkpoint.parent / "launch.json"
+        source_task = "jump" if saved.get("jump_task") else (json.loads(launch_path.read_text()).get("task") if launch_path.is_file() else None)
+        if source_task != "jump":
+            raise ValueError("Seeding jump from stand/walk requires --transfer_actor; resume/finetune requires jump weights")
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
 app = AppLauncher(args).app
 
 import gymnasium as gym
@@ -64,6 +73,9 @@ from wheel_legged_lab.runners import NoiseFloorRunner, clamp_policy_noise
 def main():
     settings = settings_for(args.task, args.robot_spec, args.strategy)
     if args.checkpoint and not args.transfer_actor:
+        if args.task == "jump":
+            from playback_config import restore_jump_settings
+            restore_jump_settings(settings, json.loads((args.checkpoint.parent / "observation_schema.json").read_text()))
         snapshot = args.checkpoint.parent / "task_settings.json"
         if snapshot.is_file():
             settings.rewards.velocity_sigma = json.loads(snapshot.read_text()).get("rewards", {}).get("velocity_sigma", 1.0)

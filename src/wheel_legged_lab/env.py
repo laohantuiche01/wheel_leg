@@ -13,6 +13,7 @@ from .robot import RobotDescription, RobotBinding
 from .components.commands import CommandSampler
 from .components.disturbances import MassRandomizer, ForceDisturbance
 from .components.jump import JumpController
+from .components.jump_task import MeasuredJumpController, jump_task_schema
 from .components.motors import MotorBank, SpringController, AuxiliaryHoldController
 from .components.observations import ObservationBuilder, observation_schema
 from .components.reset import ResetController
@@ -41,7 +42,9 @@ class WheelLeggedEnv(DirectRLEnv):
         self.force = ForceDisturbance(self.robot, s.force, n, device)
         command_type = LocomotionCommands if s.task in ("walk", "spin") else CommandSampler
         self.commands = command_type(s.commands, n, device)
-        self.jump = JumpController(s.jump, n, device)
+        jump_type = MeasuredJumpController if s.jump.enabled and s.jump.implementation == "measured_v1" else JumpController
+        self.jump = jump_type(s.jump, n, device)
+        self.record_jump_transitions = False
         self.reader = StateReader(self.robot, self.contact_sensor, self.binding, self.description,
                                   self.scene.env_origins, s.contact_force_threshold, self.gimbal_heading)
         self.observations = ObservationBuilder(s.observations, self.robot, self.motors,
@@ -75,6 +78,8 @@ class WheelLeggedEnv(DirectRLEnv):
             self.observation_schema["motion_task"] = dict(task=s.task, commands=asdict(s.commands),
                 spin=asdict(s.spin), velocity_reference=s.rewards.velocity_reference,
                 support_all_ground=s.rewards.support_all_ground, lean_in_turns=s.rewards.lean_in_turns)
+        if isinstance(self.jump, MeasuredJumpController):
+            self.observation_schema["jump_task"] = jump_task_schema(s)
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -121,12 +126,17 @@ class WheelLeggedEnv(DirectRLEnv):
         ordinary = -state.gravity[:, 2] < tilt_limit
         terminate = self.termination.update(ordinary, immediate, self.common_step_counter).clone()
         timeout = self.episode_length_buf >= self.max_episode_length - 1
+        if isinstance(self.jump, MeasuredJumpController):
+            self.jump.abort(terminate | timeout)
         return terminate, timeout
 
     def _get_rewards(self):
         if self._reward_tick != self.common_step_counter:
             self._reward = self.rewards.compute(self._finish_step(), self.commands, self.motors,
                                                 self.jump, self.reset_terminated, self.step_dt)
+            if self.record_jump_transitions and isinstance(self.jump, MeasuredJumpController):
+                # Preserve the pre-reset terminal events for exact trial evaluation.
+                self.extras["jump_transition"] = self.jump.transition_snapshot(self._state)
             # Commands for the NEXT policy decision, after the old command is scored.
             self.commands.advance(self.step_dt)
             self._reward_tick = self.common_step_counter
@@ -146,6 +156,8 @@ class WheelLeggedEnv(DirectRLEnv):
             logs["Episode/Jump/SuccessPerAttempt"] = self.jump.successes[env_ids].sum() / attempts
             logs["Episode/Jump/AttemptCount"] = self.jump.attempts[env_ids].mean()
             self.extras["log"] = logs
+            if isinstance(self.jump, MeasuredJumpController):
+                logs.update(self.jump.episode_logs(env_ids))
         super()._reset_idx(env_ids)
         if not self._components_ready:
             return
