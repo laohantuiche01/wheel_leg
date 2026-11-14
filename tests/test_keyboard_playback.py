@@ -246,6 +246,26 @@ class KeyboardPlaybackTest(unittest.TestCase):
             self.assertEqual(rows[-1]['kind'],'close')
             self.assertTrue(any(row.get('requested',[0])[0]==2. for row in rows))
 
+    def test_jump_feedback_logs_pending_push_and_failed_attempt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'jump.jsonl'
+            adapter,callback,_,_,_=self.adapter('jump',log_path=path)
+            status=dict(phase='IDLE',pending=True,attempts=0,releases=0,takeoffs=0,successes=0,
+                failures=0,blocked=['height'],max_upward_speed=0.,release_speed_required=.7)
+            adapter.env.jump=types.SimpleNamespace(diagnostics=lambda:dict(status))
+            callback(types.SimpleNamespace(input='Q',type=1));adapter.advance(.02)
+            adapter.report_jump_status();adapter.report_jump_status()
+            status.update(phase='PUSH',pending=False,attempts=1,blocked=[])
+            adapter.report_jump_status()
+            status.update(phase='IDLE',failures=1,max_upward_speed=.1)
+            adapter.report_jump_status();adapter.close()
+            rows=[json.loads(line) for line in path.read_text().splitlines()]
+            self.assertEqual(sum(row['kind']=='jump_request' for row in rows),1)
+            feedback=[row for row in rows if row['kind']=='jump_status']
+            self.assertEqual(len(feedback),3)
+            self.assertEqual(feedback[0]['blocked'],['height'])
+            self.assertEqual(feedback[-1]['failures'],1)
+
 
 if __name__ == '__main__':
     unittest.main()

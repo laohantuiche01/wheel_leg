@@ -131,6 +131,7 @@ class PlaybackKeyboard:
         self._last_print = -math.inf
         self._last_trace = -math.inf
         self._last_trace_command = None
+        self._last_jump_status = None
         self._log = None
         if log_path is not None:
             log_path = Path(log_path)
@@ -173,6 +174,7 @@ class PlaybackKeyboard:
         self.env.set_height_command(command.height)
         if command.jump:
             self.env.request_jump_takeoff()
+            self._trace("jump_request")
         now = time.monotonic()
         if now - self._last_trace >= 1. or command != self._last_trace_command:
             data = dict(focused=self._window.is_focused(), held=sorted(self.state.pressed),
@@ -195,6 +197,29 @@ class PlaybackKeyboard:
             self._last_print = now
             self._last_command = command
         return command
+
+    def report_jump_status(self):
+        jump = getattr(self.env, "jump", None)
+        if not self.state.can_jump or not hasattr(jump, "diagnostics"):
+            return
+        status = jump.diagnostics()
+        key = (status['phase'], status['pending'], status['attempts'], status['releases'],
+               status['takeoffs'], status['successes'], status['failures'],
+               tuple(status['blocked']) if status['pending'] else ())
+        if key == self._last_jump_status:
+            return
+        previous = self._last_jump_status
+        self._last_jump_status = key
+        self._trace("jump_status", **status)
+        if status['pending']:
+            detail = 'request queued; waiting for ' + (', '.join(status['blocked']) or 'next control step')
+        elif previous is not None and status['failures'] > previous[6]:
+            detail = (f"attempt failed; max upward speed={status['max_upward_speed']:.3f} m/s, "
+                      f"release requires >= {status['release_speed_required']:.3f} m/s "
+                      "and height/unloading gate")
+        else:
+            detail = f"attempts={status['attempts']}, releases={status['releases']}, takeoffs={status['takeoffs']}, landings={status['successes']}"
+        print(f"[Jump] {status['phase']}: {detail}", flush=True)
 
     def help_text(self):
         lines = ["[INFO] Keyboard enabled: click the Isaac Sim viewport to focus it.",

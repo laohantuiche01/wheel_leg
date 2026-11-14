@@ -109,6 +109,7 @@ def main():
                 keyboard = PlaybackKeyboard(u, state, log_path=log_path)
                 print(keyboard.help_text(), flush=True)
                 keyboard.advance(0.)
+                keyboard.report_jump_status()
             obs = env.get_observations()
             for step in count():
                 if not app.is_running() or (args.steps and step >= args.steps):
@@ -121,6 +122,8 @@ def main():
                 if args.task == "jump" and not args.keyboard and step == round(args.jump_at / u.step_dt):
                     u.request_jump_takeoff()
                 obs, _, dones, _ = env.step(policy(obs))
+                if keyboard is not None:
+                    keyboard.report_jump_status()
                 if keyboard is not None and bool(dones.any()):
                     keyboard.reset()
                     keyboard.advance(0.)
