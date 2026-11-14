@@ -146,6 +146,8 @@ $PY scripts/play.py --checkpoint /absolute/path/to/spin/model_2999.pt \
 回放不加 `--headless` 即显示窗口。`spin` 可加 `--wz -2` 反转，
 加 `--gimbal_heading 0` 将云台目标固定到世界 yaw=0 rad；它拒绝非零平移命令。
 手动命令也经过静置和渐变，并在自动复位后继续生效。
+键盘交互回放加 `--keyboard`，按键、参数优先级和最新权重示例见 [键盘回放](KEYBOARD_PLAYBACK.md)。
+键盘模式在回合复位时清除按键，固定 CLI 指令仍保持优先。
 
 需要记录速度跟踪、姿态、复位数、轮轴漂移与云台世界朝向时：
 
