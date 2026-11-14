@@ -121,6 +121,7 @@ class RewardSettings:
     velocity_reference: str = "base_body"
     support_all_ground: bool = False
     lean_in_turns: bool = False
+    push_regularization_scale: float = 1.0
     weights: dict[str, float] = field(default_factory=lambda: {
         "velocity": 2.0, "velocity_error": -0.25,
         "yaw": 1.5, "yaw_error": -0.25,
@@ -137,6 +138,7 @@ class RewardSettings:
         "jump_push_velocity": 4.0, "jump_push_height": 2.0,
         "jump_airtime": 3.0, "jump_peak": 50.0, "jump_success": 100.0,
         "jump_takeoff": 0.0, "jump_failed": 0.0,
+        "jump_push_height_progress": 0.0,
     })
 
 @dataclass
@@ -213,8 +215,10 @@ class TaskSettings:
         if self.jump.timeout_s <= self.jump.max_push_s + self.jump.stable_landing_s:
             raise ValueError("Jump timeout must leave time for landing")
         j = self.jump
-        if j.implementation not in ("legacy", "measured_v1"):
+        if j.implementation not in ("legacy", "measured_v1", "measured_v2"):
             raise ValueError("Unknown jump implementation")
+        if not math.isfinite(self.rewards.push_regularization_scale) or not 0 < self.rewards.push_regularization_scale <= 1:
+            raise ValueError("Push regularization scale must lie in (0, 1]")
         jump_values = (j.rate_per_s, j.min_episode_s, j.cooldown_s, *j.peak_height, j.release_height,
             j.max_push_s, j.timeout_s, j.min_air_s, j.air_clearance, j.min_upward_speed,
             j.stable_landing_s, j.height_tolerance, j.horizontal_speed_tolerance,
@@ -227,6 +231,15 @@ class TaskSettings:
                 or not 0 < j.release_speed_fraction <= 1 or not 0 < j.tilt_cos_min <= 1
                 or not 0 < j.push_timeout_s < j.timeout_s):
             raise ValueError("Invalid jump timing or release/landing gates")
+
+def apply_jump_reward_profile(settings):
+    """Versioned profiles keep old jump checkpoint evaluation reproducible."""
+    dense = settings.jump.implementation == "measured_v2"
+    settings.rewards.push_regularization_scale = .2 if dense else 1.0
+    settings.rewards.weights.update(jump_push_velocity=10.0 if dense else 1.0, jump_push_height=.25,
+        jump_push_height_progress=4.0 if dense else 0.0, jump_takeoff=200.0 if dense else 100.0,
+        jump_success=300.0 if dense else 200.0, jump_failed=-50.0 if dense else -25.0)
+
 
 def settings_for(task: str, robot_file: str | None = None, strategy: str = "baseline") -> TaskSettings:
     from .robot import RobotDescription
@@ -246,9 +259,8 @@ def settings_for(task: str, robot_file: str | None = None, strategy: str = "base
     if task == "jump":
         s.commands.height = (0.28, 0.28)
         s.jump.enabled = True
-        s.jump.implementation = "measured_v1"
-        s.rewards.weights.update(jump_push_velocity=1.0, jump_push_height=0.25,
-                                 jump_takeoff=100.0, jump_success=200.0, jump_failed=-25.0)
+        s.jump.implementation = "measured_v2"
+        apply_jump_reward_profile(s)
     if task in ("walk", "spin"):
         s.commands.height = (0.35, 0.35)
         s.rewards.velocity_reference = "axle_heading"

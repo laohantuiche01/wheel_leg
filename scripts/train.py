@@ -18,6 +18,8 @@ parser.add_argument("--robot_spec", type=str)
 parser.add_argument("--strategy", choices=("baseline", "legacy_ppo"), default="baseline")
 parser.add_argument("--actor_history", type=int, default=1)
 parser.add_argument("--noise_std_floor", type=float, default=None)
+parser.add_argument("--jump_profile", choices=("measured_v1", "measured_v2"), default=None,
+                    help="Jump-only training profile; new training defaults to measured_v2")
 parser.add_argument("--motor_curves", type=Path, help="JSON map: motor group -> output-shaft [rad/s, Nm] points")
 parser.add_argument("--checkpoint", type=Path)
 parser.add_argument("--resume", action="store_true")
@@ -36,6 +38,8 @@ parser.add_argument("--pushes", action="store_true")
 parser.add_argument("--log_root", type=Path, default=bootstrap.ROOT / "logs")
 AppLauncher.add_app_launcher_args(parser)
 args = parser.parse_args()
+if args.jump_profile is not None and args.task != "jump":
+    parser.error("--jump_profile is only available for --task jump")
 if args.velocity_sigma is not None and (not args.finetune or args.task != "walk"
                                         or not 0 < args.velocity_sigma < float("inf")):
     parser.error("--velocity_sigma requires walk --finetune and a finite positive value")
@@ -65,17 +69,22 @@ from isaaclab.utils.io import dump_yaml
 from rsl_rl.runners import OnPolicyRunner
 import wheel_legged_lab
 from wheel_legged_lab.config import WheelLeggedEnvCfg
-from wheel_legged_lab.settings import settings_for
+from wheel_legged_lab.settings import settings_for, apply_jump_reward_profile
 from wheel_legged_lab.ppo import WheelLeggedPPORunnerCfg
 from wheel_legged_lab.checkpoints import save_schema, validate_checkpoint, transfer_locomotion_actor
 from wheel_legged_lab.runners import NoiseFloorRunner, clamp_policy_noise
 
 def main():
     settings = settings_for(args.task, args.robot_spec, args.strategy)
+    if args.jump_profile is not None:
+        settings.jump.implementation = args.jump_profile
+        apply_jump_reward_profile(settings)
     if args.checkpoint and not args.transfer_actor:
         if args.task == "jump":
             from playback_config import restore_jump_settings
             restore_jump_settings(settings, json.loads((args.checkpoint.parent / "observation_schema.json").read_text()))
+            if args.jump_profile is not None and settings.jump.implementation != args.jump_profile:
+                raise ValueError("Changing a jump profile requires --transfer_actor and a fresh critic/optimizer")
         snapshot = args.checkpoint.parent / "task_settings.json"
         if snapshot.is_file():
             settings.rewards.velocity_sigma = json.loads(snapshot.read_text()).get("rewards", {}).get("velocity_sigma", 1.0)
@@ -89,12 +98,15 @@ def main():
     cfg = WheelLeggedEnvCfg(settings=settings)
     cfg.scene.num_envs, cfg.sim.device, cfg.seed = args.num_envs, args.device, args.seed
     agent = WheelLeggedPPORunnerCfg()
+    dense_jump = settings.task == "jump" and settings.jump.implementation == "measured_v2"
+    if dense_jump:
+        agent.policy.init_noise_std = .35
     agent.device, agent.seed, agent.max_iterations = args.device, args.seed, args.max_iterations
     if args.finetune:
         agent.algorithm.learning_rate = 3e-5
         agent.algorithm.num_learning_epochs = 3
         agent.save_interval = 50
-    floor = args.noise_std_floor if args.noise_std_floor is not None else (0.1 if args.strategy == "legacy_ppo" else 0.0)
+    floor = args.noise_std_floor if args.noise_std_floor is not None else (.25 if dense_jump else (0.1 if args.strategy == "legacy_ppo" else 0.0))
     if not 0 <= floor < float("inf"):
         raise ValueError("noise_std_floor must be finite and nonnegative")
     if args.resume and not args.checkpoint:

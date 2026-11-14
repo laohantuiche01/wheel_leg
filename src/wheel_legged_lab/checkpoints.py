@@ -76,10 +76,21 @@ def transfer_locomotion_actor(policy, path, schema, *, device="cpu"):
             target[key] = old
         else:
             raise ValueError(f"Actor hidden layer shape differs: {key}")
+    phase_columns = []
+    if (expected.get("jump_task", {}).get("version") == "measured-jump-v2"
+            and actual.get("jump_task", {}).get("version") != "measured-jump-v2"):
+        # These two slots were always zero in the older seven-field task mode.
+        # Start their new phase signals neutrally rather than activating random
+        # first-layer coefficients that were never trained on a nonzero input.
+        phase_columns = [frame * new_width + base_width - 6 + offset
+                         for frame in range(history) for offset in (0, 1)]
+        target["actor.0.weight"] = target["actor.0.weight"].clone()
+        target["actor.0.weight"][:, phase_columns] = 0
     policy.load_state_dict(target, strict=True)
     return dict(source=str(path.resolve()), source_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
         source_actor_dim=actual["actor_dim"], destination_actor_dim=expected["actor_dim"], history=history,
-        zeroed_new_columns=(new_width - old_width) * history, critic="fresh initialization", optimizer="fresh initialization")
+        zeroed_new_columns=(new_width - old_width) * history, zeroed_phase_columns=phase_columns,
+        critic="fresh initialization", optimizer="fresh initialization")
 
 def save_schema(directory, schema):
     path = Path(directory) / "observation_schema.json"

@@ -13,7 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 package=types.ModuleType('wheel_legged_lab');package.__path__=[str(ROOT/'src/wheel_legged_lab')]
 sys.modules.setdefault('wheel_legged_lab',package)
 sys.path.insert(0,str(ROOT/'scripts'))
-from wheel_legged_lab.settings import settings_for
+from wheel_legged_lab.settings import settings_for, apply_jump_reward_profile
 from wheel_legged_lab.components.jump_task import MeasuredJumpController, jump_task_schema
 from wheel_legged_lab.components.rewards import RewardModel
 from wheel_legged_lab.checkpoints import save_schema,validate_checkpoint,transfer_locomotion_actor
@@ -21,8 +21,9 @@ from playback_config import restore_runtime_settings
 
 
 class JumpTaskTest(unittest.TestCase):
-    def make(self,n=1,min_age=0):
+    def make(self,n=1,min_age=0,profile='measured_v1'):
         s=settings_for('jump');s.jump.automatic=False;s.jump.min_episode_s=min_age
+        s.jump.implementation=profile;apply_jump_reward_profile(s)
         j=MeasuredJumpController(s.jump,n,'cpu')
         state=types.SimpleNamespace(height=torch.full((n,),.28),vertical_velocity=torch.zeros(n),
             wheel_clearance=torch.zeros(n,2),wheel_contact=torch.ones(n,2,dtype=torch.bool),
@@ -55,7 +56,7 @@ class JumpTaskTest(unittest.TestCase):
 
     def test_settings_are_in_place_and_parameters_are_validated(self):
         s=settings_for('jump')
-        self.assertEqual(s.jump.implementation,'measured_v1')
+        self.assertEqual(s.jump.implementation,'measured_v2')
         self.assertEqual(s.commands.vx,(0.,0.));self.assertEqual(s.commands.wz,(0.,0.))
         for name,value in [('release_speed_fraction',1.1),('min_air_s',0),('push_timeout_s',2),('peak_height',(.2,.3)),('rate_per_s',float('nan'))]:
             other=deepcopy(s);setattr(other.jump,name,value)
@@ -146,6 +147,24 @@ class JumpTaskTest(unittest.TestCase):
         self.step(j,state,c,10)
         self.assertEqual(float(j.attempts[0]),1.);self.assertFalse(j.requested.any())
 
+    def test_readonly_diagnostics_identify_waiting_gates_and_push_failure(self):
+        _,j,state,c=self.make(min_age=.04)
+        j.request(torch.tensor([0]));state.height[:]=.4
+        self.step(j,state,c)
+        before=j.elapsed.clone()
+        status=j.diagnostics()
+        self.assertTrue(status['pending'])
+        self.assertIn('height',status['blocked']);self.assertIn('minimum_age',status['blocked'])
+        torch.testing.assert_close(j.elapsed,before)
+        state.height[:]=.28
+        self.step(j,state,c)
+        self.assertEqual(j.diagnostics()['phase'],'PUSH')
+        self.step(j,state,c,14)
+        status=j.diagnostics()
+        self.assertEqual(status['failures'],1)
+        self.assertEqual(status['max_upward_speed'],0.)
+        self.assertGreaterEqual(status['release_speed_required'],.3)
+
     def test_fall_on_landing_tick_cancels_success_and_snapshot_survives_reset(self):
         _,j,state,c=self.make();self.enter(j,state,c);self.flight(j,state,c);self.landing(j,state,c,10)
         self.assertTrue(j.success_event.all())
@@ -168,6 +187,65 @@ class JumpTaskTest(unittest.TestCase):
             if speed<=.3:self.assertEqual(value,0.)
             total+=value
         self.assertAlmostEqual(total,1.,places=6)
+
+    def test_v2_rewards_low_speed_improvement_without_changing_takeoff_gate(self):
+        _,j,state,c=self.make(profile='measured_v2');self.enter(j,state,c)
+        state.vertical_velocity[:]=.1
+        self.step(j,state,c)
+        self.assertGreater(float(j.push_progress_reward[0]),0.)
+        self.assertEqual(j.cfg.min_upward_speed,.3)
+        self.assertFalse(j.takeoff_event.any());self.assertFalse(j.release_event.any())
+        self.step(j,state,c)
+        self.assertEqual(float(j.push_progress_reward[0]),0.)
+        state.vertical_velocity[:]=0
+        self.step(j,state,c)
+        state.vertical_velocity[:]=.1
+        self.step(j,state,c)
+        self.assertEqual(float(j.push_progress_reward[0]),0.)
+
+    def test_v2_height_progress_is_measured_bounded_and_not_repeated(self):
+        _,j,state,c=self.make(profile='measured_v2');self.enter(j,state,c)
+        total=0.
+        for height in [.28,.29,.29,.285,.32,.34,.36]:
+            state.height[:]=height
+            self.step(j,state,c)
+            total+=float(j.height_progress_reward[0])*.02
+        self.assertAlmostEqual(total,1.,places=5)
+        self.step(j,state,c)
+        self.assertEqual(float(j.height_progress_reward[0]),0.)
+
+    def test_v2_phase_observations_disambiguate_push_and_flight(self):
+        _,j,state,c=self.make(profile='measured_v2');self.enter(j,state,c)
+        torch.testing.assert_close(j.observation()[0,:5],torch.tensor([0.,1.,0.,0.,1.]))
+        self.flight(j,state,c)
+        torch.testing.assert_close(j.observation()[0,:5],torch.tensor([0.,0.,1.,0.,1.]))
+        self.landing(j,state,c)
+        torch.testing.assert_close(j.observation()[0],torch.tensor([1.,0.,0.,0.,0.,0.,0.]))
+
+    def test_v1_checkpoint_restores_original_sparse_rewards_and_mode(self):
+        s,_,_,_=self.make(profile='measured_v1')
+        saved={'jump_task':jump_task_schema(s)}
+        self.assertEqual(saved['jump_task']['version'],'measured-jump-v1')
+        restored=settings_for('jump');restore_runtime_settings(restored,saved)
+        self.assertEqual(restored.jump.implementation,'measured_v1')
+        self.assertEqual(restored.rewards.weights['jump_push_velocity'],1.)
+        self.assertEqual(restored.rewards.weights['jump_push_height_progress'],0.)
+        self.assertEqual(restored.rewards.push_regularization_scale,1.)
+        current=settings_for('jump')
+        self.assertEqual(jump_task_schema(current)['version'],'measured-jump-v2')
+        with tempfile.TemporaryDirectory() as directory:
+            save_schema(directory,saved)
+            with self.assertRaises(ValueError):validate_checkpoint(Path(directory)/'x.pt',{'jump_task':jump_task_schema(current)})
+
+    def test_v2_push_reduces_effort_cost_while_landing_restores_it(self):
+        s,j,state,c=self.make(profile='measured_v2');self.enter(j,state,c)
+        s.rewards.weights={name:0. for name in s.rewards.weights};s.rewards.weights['torque']=-1.
+        r=RewardModel(s.rewards,1,'cpu')
+        m=types.SimpleNamespace(actions=torch.zeros(1,6),previous=torch.zeros(1,6),effort=torch.ones(1,6))
+        push=float(r.compute(state,c,m,j,torch.tensor([False]),.02)[0])
+        j.phase[:]=j.LAND
+        land=float(r.compute(state,c,m,j,torch.tensor([False]),.02)[0])
+        self.assertAlmostEqual(push,land*.2,places=6)
 
     def test_jump_metadata_restores_profile_and_rejects_equal_width_old_weights(self):
         s=settings_for('jump');s.jump.peak_height=(.42,.46)
@@ -203,7 +281,10 @@ class JumpTaskTest(unittest.TestCase):
             audit=transfer_locomotion_actor(target,path,destination)
             self.assertEqual(audit['zeroed_new_columns'],0)
             for key,value in target.state_dict().items():
-                if key.startswith('actor.'):torch.testing.assert_close(value,source.state_dict()[key])
+                if key.startswith('actor.'):
+                    expected=source.state_dict()[key].clone()
+                    if key=='actor.0.weight':expected[:,[29,30]]=0
+                    torch.testing.assert_close(value,expected)
                 if key.startswith('critic.'):torch.testing.assert_close(value,critic[key])
 
 if __name__=='__main__':unittest.main()

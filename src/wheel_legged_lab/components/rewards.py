@@ -27,6 +27,7 @@ class RewardModel:
         measured_jump = getattr(jump, "measured", False)
         positive_scale = 1.0 - 0.5 * (1.0 - ground_phase) if measured_jump else 1.0
         posture_mask = 1.0 if measured_jump else ground_phase
+        regularization = 1.0 - push * (1.0 - getattr(self.cfg, "push_regularization_scale", 1.0))
         upright = (-state.gravity[:, 2]).clamp(0., 1.)
         roll, pitch = body_tilt_angles(state.gravity)
         stagger = getattr(state, "wheel_fore_aft_difference", None)
@@ -65,8 +66,8 @@ class RewardModel:
             "gimbal_heading": torch.exp(-(heading_error / self.heading_sigma).square()),
             "gimbal_heading_error": heading_error.square(),
             "vertical_velocity": ground_phase * state.vertical_velocity.square(),
-            "torque": motors.effort.square().sum(dim=1),
-            "action_rate": (motors.actions - motors.previous).square().sum(dim=1),
+            "torque": regularization * motors.effort.square().sum(dim=1),
+            "action_rate": regularization * (motors.actions - motors.previous).square().sum(dim=1),
             "action_smoothness": second_diff.square().sum(dim=1), "wheel_power": wheel_power,
             "termination": terminated.float(),
             "jump_push_velocity": (jump.push_progress_reward if measured_jump else
@@ -77,6 +78,7 @@ class RewardModel:
             "jump_success": jump.success_event.float(),
             "jump_takeoff": jump.takeoff_event.float() if measured_jump else torch.zeros_like(state.height),
             "jump_failed": jump.failure_event.float() if measured_jump else torch.zeros_like(state.height),
+            "jump_push_height_progress": jump.height_progress_reward if measured_jump else torch.zeros_like(state.height),
         }
         missing = set(self.weights) - set(terms)
         if missing:

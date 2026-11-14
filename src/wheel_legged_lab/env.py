@@ -42,7 +42,7 @@ class WheelLeggedEnv(DirectRLEnv):
         self.force = ForceDisturbance(self.robot, s.force, n, device)
         command_type = LocomotionCommands if s.task in ("walk", "spin") else CommandSampler
         self.commands = command_type(s.commands, n, device)
-        jump_type = MeasuredJumpController if s.jump.enabled and s.jump.implementation == "measured_v1" else JumpController
+        jump_type = MeasuredJumpController if s.jump.enabled and s.jump.implementation in ("measured_v1", "measured_v2") else JumpController
         self.jump = jump_type(s.jump, n, device)
         self.record_jump_transitions = False
         self.reader = StateReader(self.robot, self.contact_sensor, self.binding, self.description,

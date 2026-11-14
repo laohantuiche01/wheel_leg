@@ -14,24 +14,30 @@ from .jump import JumpController
 def jump_task_schema(settings):
     values = asdict(settings.jump)
     values.pop('automatic')  # training vs explicit playback trigger, not observation semantics
-    return dict(version='measured-jump-v1', commands=asdict(settings.commands), jump=values)
+    version = 'measured-jump-v2' if settings.jump.implementation == 'measured_v2' else 'measured-jump-v1'
+    return dict(version=version, commands=asdict(settings.commands), jump=values)
 
 
 class MeasuredJumpController(JumpController):
     measured = True
+    readiness_names = ('minimum_age', 'cooldown', 'wheel_contact', 'finite_state', 'wheel_only_contact',
+                       'height', 'vertical_speed', 'tilt', 'angular_speed', 'horizontal_speed')
 
     def __init__(self, cfg, n, device):
         super().__init__(cfg, n, device)
+        self.dense_push = cfg.implementation == 'measured_v2'
         for name in ('release_event', 'failure_event', 'push_timeout_event'):
             setattr(self, name, torch.zeros(n, dtype=torch.bool, device=device))
         for name in ('age', 'push_progress', 'push_progress_reward', 'releases', 'failures',
                      'push_timeouts', 'no_air_timeouts', 'landing_timeouts', 'release_speed_sum',
                      'release_time_sum', 'release_clearance_sum', 'release_force_sum',
-                     'landing_samples', 'stable_time_max'):
+                     'landing_samples', 'stable_time_max', 'height_progress', 'height_progress_reward',
+                     'push_height_progress_sum', 'push_velocity_progress_sum'):
             setattr(self, name, torch.zeros(n, device=device))
         self.landing_blocked = torch.zeros(n, 5, device=device)
         self.age = self.age.double()
         self.ready_height_tolerance = cfg.height_tolerance
+        self.readiness_gates = torch.zeros(n, len(self.readiness_names), dtype=torch.bool, device=device)
 
     def request(self, ids):
         if not self.cfg.enabled:
@@ -60,6 +66,7 @@ class MeasuredJumpController(JumpController):
                      'release_event', 'failure_event', 'push_timeout_event', 'air_now'):
             getattr(self, name).zero_()
         self.push_progress_reward.zero_()
+        self.height_progress_reward.zero_()
         if not c.enabled:
             return
         if dt <= 0:
@@ -74,11 +81,20 @@ class MeasuredJumpController(JumpController):
         self.elapsed[active] += dt
         self.peak[active] = torch.maximum(self.peak[active], state.height[active])
         self.max_upward_speed[pushing] = torch.maximum(self.max_upward_speed[pushing], state.vertical_velocity[pushing])
-        progress = ((state.vertical_velocity - c.min_upward_speed) /
-                    (self.release_velocity - c.min_upward_speed).clamp(min=1e-6)).clamp(0, 1)
+        floor = 0.0 if self.dense_push else c.min_upward_speed
+        progress = ((state.vertical_velocity - floor) /
+                    (self.release_velocity - floor).clamp(min=1e-6)).clamp(0, 1)
         improved = torch.maximum(self.push_progress, progress)
         self.push_progress_reward[pushing] = (improved[pushing] - self.push_progress[pushing]) / dt
         self.push_progress[pushing] = improved[pushing]
+        self.push_velocity_progress_sum += self.push_progress_reward * dt
+        if self.dense_push:
+            height_progress = ((state.height - self.start_height) /
+                (c.release_height - self.start_height).clamp(min=.03)).clamp(0, 1)
+            improved_height = torch.maximum(self.height_progress, height_progress)
+            self.height_progress_reward[pushing] = (improved_height[pushing] - self.height_progress[pushing]) / dt
+            self.height_progress[pushing] = improved_height[pushing]
+            self.push_height_progress_sum += self.height_progress_reward * dt
 
         air = active & state.finite & (state.wheel_clearance > c.air_clearance).all(dim=1) & ~state.wheel_contact.any(dim=1)
         self.air_now.copy_(air)
@@ -130,6 +146,8 @@ class MeasuredJumpController(JumpController):
 
         ready_gates = gates.clone()
         ready_gates[:, 0] = (state.height - commands.height).abs() <= self.ready_height_tolerance
+        self.readiness_gates.copy_(torch.cat((torch.stack((self.age + 1e-6 >= c.min_episode_s,
+            self.cooldown <= 0, both, state.finite, valid_contact), dim=1), ready_gates), dim=1))
         ready = ((self.phase == self.IDLE) & (self.cooldown <= 0) & (self.age + 1e-6 >= c.min_episode_s)
             & both & state.finite & valid_contact & ready_gates.all(dim=1))
         if c.automatic:
@@ -139,7 +157,7 @@ class MeasuredJumpController(JumpController):
         self.attempts += enter.float()
         self.phase[enter] = self.PUSH
         self.requested[enter] = False
-        for name in ('elapsed', 'air_time', 'stable_time', 'push_progress', 'max_upward_speed'):
+        for name in ('elapsed', 'air_time', 'stable_time', 'push_progress', 'max_upward_speed', 'height_progress'):
             getattr(self, name)[enter] = 0
         self.seen_air[enter] = False
         self.start_height[enter] = state.height[enter]
@@ -149,6 +167,18 @@ class MeasuredJumpController(JumpController):
         duration = 2 * (c.release_height - self.start_height[enter]).clamp(min=.01) / self.release_velocity[enter].clamp(min=.1)
         self.push_duration[enter] = duration.clamp(min=dt, max=c.max_push_s)
 
+    def diagnostics(self, index=0):
+        """Read-only playback feedback; no timer or phase advancement."""
+        gates = self.readiness_gates[index].tolist()
+        return dict(phase=('IDLE', 'PUSH', 'FLIGHT', 'LAND')[int(self.phase[index])],
+            pending=bool(self.requested[index]), attempts=int(self.attempts[index]),
+            releases=int(self.releases[index]), takeoffs=int(self.takeoffs[index]),
+            successes=int(self.successes[index]), failures=int(self.failures[index]),
+            max_upward_speed=float(self.max_upward_speed[index]),
+            release_speed_required=max(float(self.release_velocity[index]) * self.cfg.release_speed_fraction,
+                                       self.cfg.min_upward_speed),
+            blocked=[name for name, ok in zip(self.readiness_names, gates) if not ok])
+
     def observation(self):
         # LAND uses the pretrained standing controller, while internal landing
         # checks continue. Seven slots and the base network width are retained.
@@ -156,6 +186,9 @@ class MeasuredJumpController(JumpController):
         flags = torch.zeros(len(self.phase), 5, device=self.phase.device)
         flags[:, 0] = (~control_jump).float()
         flags[:, 4] = control_jump.float()
+        if self.dense_push:
+            flags[:, 1] = (self.phase == self.PUSH).float()
+            flags[:, 2] = (self.phase == self.FLIGHT).float()
         return torch.cat((flags, torch.where(control_jump, self.target_peak, 0.)[:, None],
             torch.where(control_jump, self.elapsed / self.cfg.timeout_s, 0.)[:, None]), dim=1)
 
@@ -183,4 +216,6 @@ class MeasuredJumpController(JumpController):
             logs[f'Episode/Jump/Landing{name}BlockedFraction'] = self.landing_blocked[ids, i].sum() / samples
         logs['Episode/Jump/LandingContactSamplesMean'] = self.landing_samples[ids].mean()
         logs['Episode/Jump/StableTimeMaxMean'] = self.stable_time_max[ids].mean()
+        logs['Episode/Jump/PushVelocityProgressPerAttempt'] = self.push_velocity_progress_sum[ids].sum() / attempts
+        logs['Episode/Jump/PushHeightProgressPerAttempt'] = self.push_height_progress_sum[ids].sum() / attempts
         return logs

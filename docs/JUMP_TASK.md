@@ -5,6 +5,9 @@
 由电机和弹簧完成起跳。Actor 每帧 35 维、Critic 60 维、动作 6 维，普通 PPO 网络保持原配置。
 当前场景是平面，速度与角速度目标均为零，先训练独立的原地跳跃。
 
+新训练默认使用 `measured_v2`。旧 `measured_v1` 权重仍从其契约恢复原来的奖励和模式编码；
+跨版本训练使用显式 actor 迁移，重新初始化 critic、优化器和探索噪声。
+
 ## 控制流程和默认参数
 
 参数在 `src/wheel_legged_lab/settings.py` 的 `JumpSettings` 与 `settings_for('jump')`。
@@ -35,32 +38,40 @@ PPO 随机初始 episode 年龄不会跳过真实 2 s 的准备时间。
 
 | 奖励项 | 权重 | 含义 |
 | --- | ---: | --- |
-| `jump_push_velocity` | 1 | 超过0.3 m/s后的最大速度进展增量，每次尝试累计最多1；静止和重复速度不重复奖励 |
+| `jump_push_velocity` | 10 | 从0 m/s开始的实测最大向上速度进展增量，归一化后每次尝试最多1；静止和重复速度不重复奖励 |
+| `jump_push_height_progress` | 4 | 相对本次起跳高度的实测抬升进展，目标为释放高度，每次尝试最多1 |
 | `jump_push_height` | 0.25 | 弱高度参考跟踪 |
 | `jump_airtime` | 3 | 真实腾空确认后的空中时间 |
 | `jump_peak` | 50 | 已确认腾空的尝试退出时，奖励实际峰值接近目标 |
-| `jump_takeoff` | 100 | 首次真实起跳事件 |
-| `jump_success` | 200 | 稳定落地事件 |
-| `jump_failed` | -25 | 蹬地超时、整次超时或尝试中摔倒 |
+| `jump_takeoff` | 200 | 首次真实起跳事件 |
+| `jump_success` | 300 | 稳定落地事件 |
+| `jump_failed` | -50 | 蹬地超时、整次超时或尝试中摔倒 |
 
-最终贡献乘控制周期0.02 s：起跳一次贡献2，稳定落地贡献4，失败贡献−0.5。
-速度进展内部除以周期，累计贡献仍最多1，避免随控制频率改变。
+最终贡献乘控制周期0.02 s：起跳一次贡献4，稳定落地贡献6，失败贡献−1。
+速度/抬升进展内部除以周期，每次尝试的原始进展各最多1，权重后的累计贡献分别最多10与4，避免随控制频率改变。
 PUSH/FLIGHT 暂停普通站高、竖直速度惩罚；LAND恢复。
 PUSH/FLIGHT 的速度、偏航、直立正奖励减半，姿态负奖励保持，避免腾空时放任翻转。
+PUSH的力矩与动作变化惩罚缩放为原来的20%，腾空和落地恢复原值。
 LAND 的七维模式观测恢复 `[1,0,0,0,0,0,0]`，此时内部仍在检验落地，未提前计成功。
+v2的前五个模式标志为 `[站立,PUSH,FLIGHT,保留,跳跃中]`，将原先相同的蹬地/腾空观测分开；
+仍保留两个峰值/时间字段，网络输入维度不变。旧策略迁移时，新启用的两列权重归零，避免激活未训练的随机系数。
 
 ## 训练
 
-从已验证的 v2 站立 actor 开始，critic、优化器和探索噪声重新初始化：
+从已学会准备姿态的旧跳跃 actor 开始，critic、优化器和探索噪声重新初始化：
 
 ```bash
 /home/rm-nuaa/wheel_leg/wheeled-legged_RL/.venv/bin/python /home/rm-nuaa/wheel_leg/IasscLab/scripts/train.py \
-  --task jump --strategy legacy_ppo \
-  --checkpoint /home/rm-nuaa/wheel_leg/IasscLab/outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt \
-  --transfer_actor --num_envs 1024 --max_iterations 3000 --headless
+  --task jump --strategy legacy_ppo --jump_profile measured_v2 \
+  --checkpoint /home/rm-nuaa/wheel_leg/IasscLab/logs/jump/2026-11-14_00-26-43/model_2999.pt \
+  --transfer_actor --num_envs 1024 --max_iterations 3000 --headless \
+  --log_root /home/rm-nuaa/wheel_leg/IasscLab/logs/jump_v2
 ```
 
-权重保存在 `logs/jump/时间戳/`。先学会0.28 m站高，再在就绪门槛内自动尝试跳跃。
+上述权重保存在 `logs/jump_v2/jump/时间戳/`。仍可从相容的站立actor开始，先学习0.28 m站高。
+v2初始动作标准差为0.35，默认下限0.25；其他任务保持原值。
+`--jump_profile measured_v1` 可复现旧训练配置，完整续训会自动恢复权重的版本；
+用旧权重直接`--resume`不会自动切成v2。
 迁移使用与来源相同的电机处理、动作顺序、PD、观测缩放/历史；有五维云台扩展的 spin actor
 不能直接种到35维跳跃策略中。同一跳跃任务继续训练时使用跳跃权重，加 `--resume`，省略 `--transfer_actor`。
 仅加载网络结构或完成短程 PPO 更新不代表已学会起跳。
@@ -107,3 +118,45 @@ TensorBoard 复位批次均值用于诊断，最终成功率使用独立试验�
 正式准备门槛下，这个只更新2次的站立种子还保持约0.36–0.40 m，没有达到0.28 m准备姿态。
 因此本次验证了执行与失败处理链路，尚未产出学会跳跃的权重；真实释放、腾空、落地恢复和失败防误判由CPU回归覆盖。
 记录位于 `outputs/jump_task_validation/report.json`，逐步轨迹在 `lifecycle_smoke/trace.jsonl`。
+
+## model_2999 回放诊断
+
+`logs/jump/2026-11-14_00-26-43/model_2999.pt` 的正式门槛评估（16环境×2轮、seed=42）：
+32次请求全部进入PUSH，32次均失败，释放/真实腾空/稳定落地均为0。
+PUSH采样中的最大向上速度约0.101 m/s，低于真实起跳所需的0.3 m/s。
+训练3000次迭代的释放率、起跳率、成功率最大值均为0，最后100次迭代约98.6%的尝试发生蹬地超时。
+人工回放日志也收到Q按键，问题来自策略尚未学会蹬地。
+
+目前速度进展奖励在超过0.3 m/s后才出现，四腿探索标准差已降到约0.10；
+这些记录提示需要补充低速蹬地的连续学习信号与课程，再重新训练，不能将站稳和高总奖励当成已学会跳跃。
+本次检查保留训练奖励、门槛及权重，补充回放状态提示与JSONL中的`jump_request`/`jump_status`记录。
+终端会显示PUSH、等待条件、失败时实测最大速度和释放速度门槛。
+诊断结果在 `outputs/jump_review_2999/`。
+
+## v2修改与训练对照
+
+本次将PUSH速度进展从0 m/s开始累计，增加有上限的实测高度进展，
+降低PUSH的力矩/动作变化惩罚，并将初始探索标准差改为0.35、默认下限改为0.25。
+PUSH与FLIGHT使用不同观测标志。真实离地、落地、摔倒、电机PD和动作幅度保持原配置。
+
+从旧`model_2999.pt`显式迁移actor，512环境训练200次更新，输出：
+`outputs/jump_fix_validation/dense_v2/jump/2026-11-14_15-25-43/model_199.pt`。
+69项CPU测试与静态检查通过；确定性评估使用正式门槛，seed=42和123各16环境×2轮，
+共64次请求、64次释放、64次真实起跳、64次稳定落地并存活至轮末，复位0次。
+机身峰值距地面约0.397–0.405 m，平均约0.401 m。
+这是固定平面和短试验窗口的结果，不能推断长时间、复杂地形或外部扰动下的成功率。
+
+真实GUI通过原生Q按下/松开事件，已验证PUSH→FLIGHT→LAND→IDLE，完成一次真实起跳和稳定落地。
+训练采样含标准差≥0.25的随机动作，其落地率低于确定性回放，不能把两者混为同一个成功率。
+
+回放本次新权重：
+
+```bash
+/home/rm-nuaa/wheel_leg/wheeled-legged_RL/.venv/bin/python /home/rm-nuaa/wheel_leg/IasscLab/scripts/play.py \
+  --checkpoint /home/rm-nuaa/wheel_leg/IasscLab/outputs/jump_fix_validation/dense_v2/jump/2026-11-14_15-25-43/model_199.pt \
+  --keyboard --num_envs 1 --steps 0
+```
+
+点击视口、站稳后按Q。继续优化噪声下的落地，可从该v2权重同版本续训，
+使用`--resume`、省略`--transfer_actor`，并显式选择`--noise_std_floor 0.1`。
+对照记录在 `outputs/jump_fix_validation/report.json`。

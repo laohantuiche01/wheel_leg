@@ -69,9 +69,10 @@ def restore_jump_settings(settings, schema):
         # Historical v2 jump checkpoints used the original timer-based helper.
         settings.jump.implementation = "legacy"
         settings.rewards.weights.update(jump_push_velocity=4., jump_push_height=2.,
-            jump_success=100., jump_takeoff=0., jump_failed=0.)
+            jump_success=100., jump_takeoff=0., jump_failed=0., jump_push_height_progress=0.)
+        settings.rewards.push_regularization_scale = 1.0
         return
-    if saved.get("version") != "measured-jump-v1":
+    if saved.get("version") not in ("measured-jump-v1", "measured-jump-v2"):
         raise ValueError("Unsupported jump checkpoint version")
     for group in ("commands", "jump"):
         target = getattr(settings, group)
@@ -79,3 +80,5 @@ def restore_jump_settings(settings, schema):
             if not hasattr(target, name):
                 raise ValueError(f"Unsupported saved jump setting: {group}.{name}")
             setattr(target, name, tuple(value) if isinstance(getattr(target, name), tuple) else value)
+    from wheel_legged_lab.settings import apply_jump_reward_profile
+    apply_jump_reward_profile(settings)
