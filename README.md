@@ -4,12 +4,15 @@
 主环境只继承一次 `DirectRLEnv`，任务差异使用配置工厂，控制和扰动使用对象组合。
 源码不导入旧 `agent_tasks`、`agent_world`、V13、V14，也不修改正在运行的旧训练。
 
-**当前状态：已完成 v2 模型适配、姿态修正、普通 PPO 机制和纯平移/原地小陀螺任务，38 项 CPU 测试通过。**
+**当前状态：已完成 v2 模型适配、姿态修正、普通 PPO 机制、纯平移/原地小陀螺和实测原地跳跃任务，62 项 CPU 测试通过。**
 原问题的实测指标见 [站姿诊断](docs/STAND_DIAGNOSIS.md)，修改内容与训练方式见 [姿态修正](docs/POSTURE_CONTROL.md)。
 新迁移机制、配置和训练命令见 [普通 PPO 迁移说明](docs/LEGACY_PPO_MIGRATION.md)。默认 `baseline` 保留已验证行为；用 `--strategy legacy_ppo` 启用新适配配置。
 回放会自动读取权重对应的策略/历史配置；退出原因和两腿前后错位的修正见 [回放与站姿修正](docs/PLAYBACK_STANCE_FIX.md)。
 当前 `walk` 只训练前后平移（±2 m/s、wz=0），`spin` 只训练原地旋转（±2 rad/s、平移为零，云台保持世界 yaw）。
 参数、Actor 迁移和命令见 [行走与小陀螺](docs/LOCOMOTION_TASKS.md)。
+回放加 `--keyboard` 可用旧项目的 W/S、A/D、Z/X、L、Q 键位，详见 [键盘回放](docs/KEYBOARD_PLAYBACK.md)。
+
+原地跳跃使用实测起跳、落地站立恢复及一次性事件奖励，训练/评估命令见 [跳跃任务](docs/JUMP_TASK.md)。
 两任务已完成短时 PPO/回放验证，尚未训练到稳定跟踪；完整物理与扰动验证仍按 [后续验证清单](docs/VALIDATION.md) 进行。
 
 ## 代码结构
@@ -29,7 +32,9 @@ src/wheel_legged_lab/
     disturbances.py         MassRandomizer / ForceDisturbance
     commands.py             CommandSampler：站立、直行、转弯、原地旋转
     locomotion.py           新任务命令渐变、独立云台世界 yaw 控制
+    keyboard.py             键盘状态、任务轴隔离与 Omniverse 输入适配
     jump.py                 JumpController：起跳、腾空、接触恢复、成功/超时
+    jump_task.py            新跳跃任务：实测释放、腾空确认、落地恢复及诊断
     state.py                StateReader：一次测量，供奖励和终止共享
     observations.py         ObservationBuilder：带版本的 Actor/Critic 观测契约
     rewards.py              RewardModel：奖励项和回合统计
