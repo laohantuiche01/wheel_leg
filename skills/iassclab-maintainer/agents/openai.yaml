@@ -1,0 +1,4 @@
+interface:
+  display_name: "IasscLab 项目维护与换机器人"
+  short_description: "先核实机器人、控制与权重契约，再维护轮腿强化学习工程与迁移模型"
+  default_prompt: "使用 $iassclab-maintainer 先核查当前机器人、checkpoint 和验证证据，再处理本次 IasscLab 修改。"

@@ -1,0 +1,110 @@
+{
+  "format_version": 1,
+  "recorded_on": "2026-11-14",
+  "snapshot_note": "Fingerprints detect changes after this handoff; they are not retroactive code provenance for historical experiments.",
+  "environment_hint": "../wheeled-legged_RL/.venv/bin/python",
+  "evidence": [
+    {
+      "id": "stand_seed_199",
+      "robot": "wheelbipe_v2_0",
+      "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+      "task": "stand",
+      "checkpoint": "outputs/stance_alignment_stable_seed/stand/2026-11-12_11-07-30/model_199.pt",
+      "checkpoint_sha256": "fb141450c7af9cffd1966bd1de533fb70a7de8f3b3a8e0fc62c5296a13152f1e",
+      "report": "outputs/jump_task_validation/report.json",
+      "result": "v2任务迁移使用过的站立种子",
+      "limits": "此报告只证明作为jump actor来源；站姿指标查历史站姿报告",
+      "robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
+      "spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e"
+    },
+    {
+      "id": "walk_separate_2000",
+      "robot": "wheelbipe_v2_0",
+      "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+      "task": "walk",
+      "checkpoint": "logs/separate_motion/walk/2026-11-13_08-41-53/model_2000.pt",
+      "checkpoint_sha256": "7aa8a64e993a541e2239b0d06b827ca6a0480ab9f8ba49fe912bc5d1c50bb5d2",
+      "report": "outputs/separate_motion_review/2026-11-13/report.json",
+      "result": "多数独立前后平移指令短期跟随",
+      "limits": "-2 m/s过冲且2/4约18.8秒失败；未验收长期/扰动/地形",
+      "robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
+      "spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e"
+    },
+    {
+      "id": "spin_separate_1100",
+      "robot": "wheelbipe_v2_0",
+      "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+      "task": "spin",
+      "checkpoint": "logs/separate_motion/spin/2026-11-13_16-30-21/model_1100.pt",
+      "checkpoint_sha256": "07467fd8ad04ff08c64114105e3e64053983b9ee06afd171d07ad4cd3d81e269",
+      "report": "outputs/separate_motion_review/2026-11-13/report.json",
+      "result": "±1/±2 rad/s短期原地旋转与云台定向",
+      "limits": "零指令停车漂移；速度与位置变化不一致待查",
+      "robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
+      "spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e"
+    },
+    {
+      "id": "jump_v1_failed_2999",
+      "robot": "wheelbipe_v2_0",
+      "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+      "task": "jump",
+      "checkpoint": "logs/jump/2026-11-14_00-26-43/model_2999.pt",
+      "checkpoint_sha256": "eee518381059e97c851a1041340ef7b6e6ae389aa4dc6321a724984bf06fbe19",
+      "report": "outputs/jump_review_2999/report.json",
+      "result": "正式32次请求全触发、全蹬地失败",
+      "limits": "没有学会起跳，勿以最大编号推荐",
+      "robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
+      "spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e"
+    },
+    {
+      "id": "jump_v2_199",
+      "robot": "wheelbipe_v2_0",
+      "asset_sha256": "4cc4333105eccf22f3417b03a092cbad93530ebdca09706c0d994fb8d7935a8a",
+      "task": "jump",
+      "checkpoint": "outputs/jump_fix_validation/dense_v2/jump/2026-11-14_15-25-43/model_199.pt",
+      "checkpoint_sha256": "46a7b589c7bd71a7e0f55a53e19b1a1efeffaf35ec8f7acb00c135da64414c3d",
+      "report": "outputs/jump_fix_validation/report.json",
+      "result": "两种子共64次正式短程起跳/稳定落地，GUI Q验证",
+      "limits": "固定平面短窗口；不是长时/抗扰动验收，也不是sim2sim",
+      "robot_spec": "src/wheel_legged_lab/assets/v2_0.json",
+      "spec_sha256": "93baa16b11efd77d3b001477f3ab4e8db16eae22300c694835519cd6d074ab7e"
+    }
+  ],
+  "source_fingerprints": {
+    "src/wheel_legged_lab/robot.py": "e05fa70303daccfa5b9ba1e0aa256736c96d11fa066ad1c13371c266e7ffd9dd",
+    "src/wheel_legged_lab/settings.py": "e7fecdeaf6fe5e5946ee50bad31fa658624e876a325adc61079431e393e142fe",
+    "src/wheel_legged_lab/config.py": "2153ceb7e4683f22b99a90b219aed01152dee16f9d8df681e2bda9a7e9e93a21",
+    "src/wheel_legged_lab/env.py": "5362bf3679efcfbc097be45da8a5254d0af4e642004f6612c55f17c4be401123",
+    "src/wheel_legged_lab/checkpoints.py": "e75d4a269a83d1a697b36942a159c7ee95a1e1bcff55fcb1e5e4dcbf7d0bd352",
+    "src/wheel_legged_lab/runners.py": "d6ff7b9fabaf19e476231ac2efc38bb3302725336338b9bd3981ecc6484ac3ac",
+    "src/wheel_legged_lab/ppo.py": "f0177573ce738e497279a30eeb9e1573aac303b208b896c2df4af07a2b479e0f",
+    "src/wheel_legged_lab/components/motors.py": "b97691cf396aa4559528879aa3f52f9f7f0858ed233d5cca787445e75e3e1033",
+    "src/wheel_legged_lab/components/commands.py": "806264daf686757966dec6cfad21176c1884e9ababc27adfc8736a2270e1b0f3",
+    "src/wheel_legged_lab/components/locomotion.py": "45dc7242c18ef0be96f8d62bcf7794e66b2e23a6ab23c6f996058f041db57a2a",
+    "src/wheel_legged_lab/components/legacy_control.py": "d6273bcba24de239240d1302779255f6091421ab19a22aaaea189c2cf786d686",
+    "src/wheel_legged_lab/components/jump.py": "d71d82ded1eebd5b6e3a8ec2945cea34123255b316be241b2c580b7550716964",
+    "src/wheel_legged_lab/components/jump_task.py": "cee97156b4703c96da5b9b526b7b6849b97e1f4715f3c423d1b08cfcc09cca1f",
+    "src/wheel_legged_lab/components/state.py": "a1d93c00020a9c3c768765b25a196dc1516bfadd569c015e86dc9cf83bbe113b",
+    "src/wheel_legged_lab/components/reset.py": "5cb8971655917a27c8b72ddd9e1951b4e805782f7fa121121c12f8d3b3a47313",
+    "src/wheel_legged_lab/components/observations.py": "930d34f24cf4ceb05301717780c8cf2778732d0f749234ee800499a536052d9c",
+    "src/wheel_legged_lab/components/rewards.py": "56ad1a0730586961d3122923d64cfbd628fcc88d01e143f7bb5be91e3235b646",
+    "src/wheel_legged_lab/components/keyboard.py": "9c2565539b5b99c3db02a6dc55cfda80f2b284b4562e32134ea0bb9462edbfed",
+    "src/wheel_legged_lab/components/keyboard_mode.py": "67fa0b9acfc3bbaf927e05337c85bda5710b0b6d594cf031025d288d88d9e703",
+    "scripts/train.py": "ead8e4c3bac8781b02d7fa4ea49ecbdb976be5115a0d5616b789f04b371764c3",
+    "scripts/play.py": "4fadc9c7595162f0e941f401968c9a384fc2e26f9c007acc062a5172db7a9c55",
+    "scripts/playback_config.py": "e4b579812ce329d5b5a8e292c41cffc6d5720083708e211c775af6853e1e8512",
+    "scripts/check_model.py": "25984be8ef3c343e9f8fbfd9225564e22b5f39a4cbb00049e66d5cb8882e7798",
+    "scripts/migrate_v2_model.py": "679249618948e00c0ce4715f3fbd24f8d1cfcac156ba610a46115171bbcc82f1"
+  },
+  "other_reports": [
+    "outputs/unified_keyboard_validation/report.json"
+  ],
+  "sim2sim": {
+    "status": "not_implemented_or_validated_in_this_repo",
+    "missing": [
+      "target MuJoCo model",
+      "policy export/deployment entry",
+      "cross-simulator control/observation parity and physical evaluation"
+    ]
+  }
+}
