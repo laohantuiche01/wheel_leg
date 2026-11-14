@@ -4,7 +4,10 @@
 主环境只继承一次 `DirectRLEnv`，任务差异使用配置工厂，控制和扰动使用对象组合。
 源码不导入旧 `agent_tasks`、`agent_world`、V13、V14，也不修改正在运行的旧训练。
 
-**当前状态：已完成 v2 模型适配、姿态修正、普通 PPO 机制、纯平移/原地小陀螺和实测原地跳跃任务，69 项 CPU 测试通过。**
+新对话先读 [AGENTS.md](AGENTS.md) 和 [项目上下文](docs/PROJECT_CONTEXT.md)，运行 `python3 scripts/project_context.py`。
+可复用 skill 源在 [iassclab-maintainer](skills/iassclab-maintainer/SKILL.md)；换机器人时按其迁移指南核对契约。
+
+**当前状态：v2模型、普通PPO、行走/旋转/跳跃与统一键盘已实现，79项CPU测试通过。**
 原问题的实测指标见 [站姿诊断](docs/STAND_DIAGNOSIS.md)，修改内容与训练方式见 [姿态修正](docs/POSTURE_CONTROL.md)。
 新迁移机制、配置和训练命令见 [普通 PPO 迁移说明](docs/LEGACY_PPO_MIGRATION.md)。默认 `baseline` 保留已验证行为；用 `--strategy legacy_ppo` 启用新适配配置。
 回放会自动读取权重对应的策略/历史配置；退出原因和两腿前后错位的修正见 [回放与站姿修正](docs/PLAYBACK_STANCE_FIX.md)。
@@ -13,7 +16,8 @@
 回放加 `--keyboard` 可用旧项目的 W/S、A/D、Z/X、L、Q 键位，详见 [键盘回放](docs/KEYBOARD_PLAYBACK.md)。
 
 原地跳跃使用实测起跳、落地站立恢复及一次性事件奖励，训练/评估命令见 [跳跃任务](docs/JUMP_TASK.md)。
-两任务已完成短时 PPO/回放验证，尚未训练到稳定跟踪；完整物理与扰动验证仍按 [后续验证清单](docs/VALIDATION.md) 进行。
+已验证范围、失败案例和具体权重集中在 [项目上下文](docs/PROJECT_CONTEXT.md) 与 [证据索引](docs/PROJECT_STATE.json)。
+walk最大倒车速度、spin停车漂移等仍有限制；跳跃v2已有短程起跳/落地证据，尚未完成sim2sim。
 
 ## 代码结构
 
@@ -32,7 +36,8 @@ src/wheel_legged_lab/
     disturbances.py         MassRandomizer / ForceDisturbance
     commands.py             CommandSampler：站立、直行、转弯、原地旋转
     locomotion.py           新任务命令渐变、独立云台世界 yaw 控制
-    keyboard.py             键盘状态、任务轴隔离与 Omniverse 输入适配
+    keyboard.py             键盘状态与 Omniverse 输入适配
+    keyboard_mode.py        所有任务共用的手动速度、高度与跳跃入口
     jump.py                 JumpController：起跳、腾空、接触恢复、成功/超时
     jump_task.py            新跳跃任务：实测释放、腾空确认、落地恢复及诊断
     state.py                StateReader：一次测量，供奖励和终止共享
@@ -42,9 +47,11 @@ src/wheel_legged_lab/
   ppo.py                    独立 PPO 配置
   checkpoints.py            保存/检查观测与机器人契约
 scripts/
+  project_context.py        标准库只读上手快照：机器人、契约、证据及变更
   train.py                  训练、恢复与显式 Actor 迁移
   play.py                   自动恢复配置、固定指令回放
   evaluate_locomotion.py    行走/小陀螺指标与轨迹导出
+  evaluate_jump.py          独立跳跃试验与逐步事件/轨迹
   static_check.py           仅 AST/JSON/TOML/文件校验，不导入工程或仿真器
   migrate_v2_model.py       从原始 USDZ 重建 v2 资产、配置和来源报告
   check_model.py            离线检查 USD 闭链、关节轴、零位和根坐标
@@ -68,7 +75,7 @@ settings.force.enabled = True
 settings.force.force_xyz = (30.0, 30.0, 0.0)  # 世界系 N，随机正负
 settings.force.duration_s = (0.1, 0.3)
 settings.force.interval_s = (5.0, 10.0)
-settings.motors.delay_steps = (0, 2)          # 控制周期，每回合采样后固定
+settings.motors.delay_steps = (0, 2)          # 每回合采样；时钟由delay_clock决定
 settings.motors.strength_range = (0.9, 1.1)
 settings.motors.use_torque_speed_envelope = True
 ```
@@ -80,7 +87,7 @@ settings.motors.use_torque_speed_envelope = True
 env.unwrapped.set_mass_scale(1.10, env_ids=[0])
 env.unwrapped.apply_external_force((30.0, 0.0, 0.0), duration_s=0.2, env_ids=[0])
 env.unwrapped.set_play_velocity_command(vx=1.0, wz=0.5, env_ids=[0])
-env.unwrapped.request_jump_takeoff(env_ids=[0])  # 仅 jump 任务
+env.unwrapped.request_jump_takeoff(env_ids=[0])  # jump任务；统一keyboard模式也开放
 ```
 
 ## 电机控制策略
@@ -93,7 +100,8 @@ env.unwrapped.request_jump_takeoff(env_ids=[0])  # 仅 jump 任务
 
 PD、强度缩放、可选力矩-转速包络和最终限幅由 `MotorBank` 在**物理子步**统一处理。
 Isaac 的策略电机执行器设为零 PD，仅接受力矩前馈，避免双重 PD。
-v2 腿/轮沿用旧控制器增益和限幅：腿 60/2、160 Nm；轮 0/0.2、5 Nm。左右关节方向在配置中显式映射到策略坐标，电机延迟按控制步计算。
+v2 腿/轮沿用旧控制器增益和限幅：腿 60/2、160 Nm；轮 0/0.2、5 Nm。左右关节方向在配置中显式映射到策略坐标。
+电机延迟时钟由`MotorSettings.delay_clock`决定：baseline默认控制步，legacy_ppo使用物理子步；观测延迟另按控制帧计算。
 弹簧拥有独立控制器，不能再由其他组件重复写同一关节。
 弹簧 `offset=None` 时取各自的模型复位位置，v2 为 0 m，v1 仍为 -0.0482 m；预载、刚度及阻尼沿用。
 云台 pitch 使用独立位置保持（关节相对零位，Kp=120、Kd=3、限幅 8 N·m），不占用策略动作。
@@ -128,8 +136,9 @@ cd /home/rm-nuaa/wheel_leg/IasscLab
 保守微调加 `--finetune`：小学习率、3 次更新、每 50 轮保存并保留源权重动作噪声；
 操作示例见 [任务说明](docs/LOCOMOTION_TASKS.md)。
 已执行的两轮行走微调、候选权重及性能取舍见 [微调实测](docs/WALK_FINETUNE.md)。
-**不要直接传旧项目 checkpoint**：虽然 Actor 仍为 35 维、Critic 为 60 维，v2 的动作关节和方向已变化，checkpoint 契约会拒绝旧权重。
-`walk` / `spin` 可通过 `--checkpoint ... --transfer_actor` 迁移本工程匹配的 v2 Actor；
+**不要按维度相同直接加载旧项目checkpoint**：动作、方向、资产或观测语义不同会被契约拒绝。
+当前6动作普通任务为Actor35/Critic60，spin为40/65；具体维度还取决于历史长度与机器人动作数。
+`walk` / `spin` / `jump` 可通过 `--checkpoint ... --transfer_actor` 迁移本工程物理契约匹配的v2 Actor；
 `spin` 逐帧扩展输入并重新初始化 Critic，命令见 [任务说明](docs/LOCOMOTION_TASKS.md)。
 入口默认使用 v2；显式回退旧模型可加
 `--robot_spec /home/rm-nuaa/wheel_leg/IasscLab/src/wheel_legged_lab/assets/v1_0.json`。

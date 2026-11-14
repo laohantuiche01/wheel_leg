@@ -10,8 +10,11 @@ flowchart TD
   E --> S[SpringController]
   E --> H[AuxiliaryHoldController]
   E --> D[MassRandomizer / ForceDisturbance]
-  E --> C[CommandSampler]
-  E --> J[JumpController]
+  E --> C[CommandSampler / LocomotionCommands]
+  E --> J[JumpController / MeasuredJumpController]
+  E --> G[GimbalHeadingController]
+  K[UnifiedKeyboardControl] --> C
+  K --> J
   E --> R[StateReader]
   R --> O[ObservationBuilder]
   R --> W[RewardModel]
@@ -19,7 +22,8 @@ flowchart TD
 ```
 
 环境没有多重继承，没有 `__getattr__` 转发，没有把旧类函数动态挂到新类上。
-组件显式接收它需要的对象和配置，避免依赖整个巨型 env 的隐藏字段。
+核心训练组件显式接收所需对象和配置。统一键盘回放层在权重验证后显式替换命令/跳跃组件，
+同时更新ObservationBuilder持有的引用；它不修改权重或训练配置，也不替代实际策略电机控制。
 
 ## 生命周期与写入所有权
 
@@ -35,7 +39,8 @@ flowchart TD
 | `_reset_idx` | 记录统计、复位所有关节、清空局部历史和外力 | 指定 env 子集 |
 
 所有策略关节的力矩只能由 `MotorBank` 写。弹簧关节由 `SpringController` 写。
-`auxiliary_holds` 中的关节仅由 `AuxiliaryHoldController` 写，Isaac 执行器为零 PD；其余辅助关节仍由阻尼执行器处理。
+`auxiliary_holds` 中的关节仅由 `AuxiliaryHoldController` 写，Isaac 执行器为零 PD；spin中的云台yaw由独立世界朝向控制器写，
+其余辅助关节由阻尼执行器处理，拥有者互斥。
 外部 wrench 只能由 `ForceDisturbance` 写；后续加入第二种扰动时，应先组合再统一提交。
 质量和惯量只能由 `MassRandomizer` 修改；名义值保留不变。
 可选 `legacy_ppo` 控制机制见 [普通 PPO 迁移](LEGACY_PPO_MIGRATION.md)。动作 EMA 在控制步执行，物理延迟及差分电机反馈在物理步执行。
@@ -55,6 +60,7 @@ v2 的 30 个 DOF 由 `joint_names` 明确列出；所有关节必须有唯一�
 - Actor：`17 + 3A`。当前 A=6，对应 35 维。
 - 可选 Actor 历史长度 H：策略输入为 `H × (17 + 3A)`；观测延迟不增加输入维度，Critic 保持当前帧。
 - Critic：`30 + 5A`。当前为 60 维。
+- spin每帧另加5个云台字段，当前Actor为`40H`、Critic65；输入历史与延迟是两种独立配置。
 - Critic 额外看到真实速度、机身高度、双轮接触、电机力矩、质量缩放、外力和电机强度。
 - Actor 的速度控制关节位置置零；当前轮子不使用无限累积转角。
 - `observation_schema.json` 记录版本、字段、动作名、方向、电机模式、尺度、资产哈希、静息位姿、几何尺寸、弹簧及辅助保持配置。
@@ -64,8 +70,8 @@ v2 的 30 个 DOF 由 `joint_names` 明确列出；所有关节必须有唯一�
 
 ## 姿态目标与指标
 
-保留原 `upright`，在 IDLE/LAND 阶段增加 roll²、pitch²、roll/pitch 角速度平方惩罚。
-PUSH/FLIGHT 阶段不施加这三个新增项，跳跃阶段调度保持原样。
+保留原 `upright`。历史实现按IDLE/LAND增加姿态负奖励；measured跳跃在PUSH/FLIGHT仍保留姿态负奖励，
+只暂停普通站高/竖直速度惩罚。measured_v2另外降低PUSH的力矩/动作变化惩罚，具体见[JUMP_TASK.md](JUMP_TASK.md)。
 日志直接给出 roll/pitch/总倾角 RMS（度）、左右轮中心高度差 RMS（米）及双轮接触比例。
 指标按实际测量时间累计，子集复位只清理对应环境的累积值，不受初始随机回合计时影响。
 
@@ -76,3 +82,4 @@ PUSH/FLIGHT 阶段不施加这三个新增项，跳跃阶段调度保持原样�
 落地成功要求双轮接触、姿态、速度和站高稳定；超时退出不算成功。
 计时只在 `_finish_step` 里推进，读取观测不会使阶段时间加倍或清空奖励事件。
 初版采用原地跳跃；行进跳跃需要独立的命令/落地容差设计。
+统一键盘可以发送组合指令，不能据此宣称独立跳跃权重已训练行进跳跃。
